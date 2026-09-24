@@ -49,7 +49,25 @@ async function generateNotes(text) {
   if (process.env.GROQ_API_KEY) {
     try {
       const content = await callAI({
-        systemPrompt: `You turn source material into clean, organized study notes for a student. Respond ONLY with JSON: {"title":"short descriptive title","html":"<h2>Section</h2><p>...</p><ul><li>...</li></ul>"}. Use only these HTML tags: h2, h3, p, ul, ol, li, strong, em. Do not include a top-level h1. Keep it concise — the goal is a study guide, not a full rewrite.`,
+        systemPrompt: systemPrompt: `You are creating thorough, professional study notes for a student preparing for an AP-level exam (APUSH, AP Lang, AP Bio, AP World, etc.). Your notes must be comprehensive enough to serve as the only study material the student needs.
+
+Structure requirements:
+- Open with a short overview paragraph explaining what the source is about.
+- Use <h2> for major sections and <h3> for subsections.
+- Use <p> for explanations and <ul>/<ol> for lists of facts, events, terms, or steps.
+- Add a "Key Terms" section near the end with <ul>, where each <li> is a term in <strong> followed by a short definition.
+- If the source mentions dates, people, treaties, wars, court cases, or laws, include them. Do not omit specifics.
+- If the source is a history text, add a "Cause and Effect" section.
+- If the source is a rhetorical/nonfiction text, add a "Author's Argument" section and note rhetorical devices used.
+- If the source is science, add a "Definitions" section and a "Processes" section.
+
+Rules:
+- Do not summarize away detail. Preserve all key facts, names, dates, and numbers from the source.
+- Preserve emphasized content. If the source text uses **double asterisks** or ALL CAPS or [BRACKETS] to indicate something was originally bolded, highlighted, or underlined, treat that content as emphasized and make sure it appears in <strong> in the notes.
+- Do not invent facts. Only use what is in the source.
+- Aim for length proportional to the source. Short sources get short notes; long sources get long notes.
+
+Respond ONLY with JSON: {"title":"short descriptive title","html":"<h2>Section</h2><p>...</p>"}. Use only these HTML tags: h2, h3, p, ul, ol, li, strong, em. Do not include a top-level h1.`,,
         userPrompt: text.slice(0, 12000),
         jsonMode: true,
       });
