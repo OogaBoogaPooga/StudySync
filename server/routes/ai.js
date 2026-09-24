@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
+import mammoth from 'mammoth';
 import * as officeparserModule from 'officeparser';
 import { z } from 'zod';
 import { requireAuth, validate, wrap } from '../middleware/auth.js';
@@ -16,7 +17,6 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
-/** Shared helper for calling Groq via its OpenAI-compatible endpoint */
 async function callAI({ systemPrompt, userPrompt, jsonMode = false }) {
   const body = {
     model: process.env.GROQ_MODEL || 'openai/gpt-oss-120b',
@@ -44,12 +44,37 @@ async function callAI({ systemPrompt, userPrompt, jsonMode = false }) {
   return data.choices[0].message.content;
 }
 
-/** Turns arbitrary source text into structured HTML notes */
-async function generateNotes(text) {
-  if (process.env.GROQ_API_KEY) {
-    try {
-      const content = await callAI({
-        systemPrompt: systemPrompt: `You are creating thorough, professional study notes for a student preparing for an AP-level exam (APUSH, AP Lang, AP Bio, AP World, etc.). Your notes must be comprehensive enough to serve as the only study material the student needs.
+/**
+ * Normalizes HTML so bold/italic/highlight/underline from Word, Google Docs,
+ * and other rich-text sources become plain <strong>, <em>, <u>, <mark> tags
+ * that the AI can recognize.
+ */
+function normalizeHtml(html) {
+  return html
+    .replace(/<span[^>]*font-weight:\s*(bold|[6-9]00)[^>]*>([\s\S]*?)<\/span>/gi, '<strong>$2</strong>')
+    .replace(/<span[^>]*font-style:\s*italic[^>]*>([\s\S]*?)<\/span>/gi, '<em>$1</em>')
+    .replace(/<span[^>]*text-decoration[^>]*underline[^>]*>([\s\S]*?)<\/span>/gi, '<u>$1</u>')
+    .replace(/<span[^>]*background-color[^>]*>([\s\S]*?)<\/span>/gi, '<mark>$1</mark>')
+    .replace(/<b(\s[^>]*)?>/gi, '<strong>')
+    .replace(/<\/b>/gi, '</strong>')
+    .replace(/<i(\s[^>]*)?>/gi, '<em>')
+    .replace(/<\/i>/gi, '</em>')
+    .replace(/<div[^>]*>/gi, '<p>')
+    .replace(/<\/div>/gi, '</p>')
+    .replace(/<\/?span[^>]*>/gi, '')
+    .replace(/<p>\s*<\/p>/gi, '')
+    .replace(/<br\s*\/?>/gi, ' ');
+}
+
+const NOTES_SYSTEM_PROMPT = `You are creating thorough, professional study notes for a student preparing for an AP-level exam (APUSH, AP Lang, AP Bio, AP World, AP Government, etc.). Your notes must be comprehensive enough to serve as the only study material the student needs.
+
+SOURCE FORMAT:
+The source may arrive as plain text OR as HTML with formatting tags. Pay attention to these tags and PRESERVE their meaning in your output:
+- <strong> or <b> = bolded in the original (usually a key term, name, or concept)
+- <em> or <i> = italicized in the original
+- <u> = underlined
+- <mark> = highlighted
+Any content that was bolded, highlighted, or underlined in the source is important and must appear in <strong> in your output.
 
 Structure requirements:
 - Open with a short overview paragraph explaining what the source is about.
@@ -58,17 +83,23 @@ Structure requirements:
 - Add a "Key Terms" section near the end with <ul>, where each <li> is a term in <strong> followed by a short definition.
 - If the source mentions dates, people, treaties, wars, court cases, or laws, include them. Do not omit specifics.
 - If the source is a history text, add a "Cause and Effect" section.
-- If the source is a rhetorical/nonfiction text, add a "Author's Argument" section and note rhetorical devices used.
+- If the source is a rhetorical/nonfiction text, add an "Author's Argument" section and note rhetorical devices used.
 - If the source is science, add a "Definitions" section and a "Processes" section.
 
 Rules:
 - Do not summarize away detail. Preserve all key facts, names, dates, and numbers from the source.
-- Preserve emphasized content. If the source text uses **double asterisks** or ALL CAPS or [BRACKETS] to indicate something was originally bolded, highlighted, or underlined, treat that content as emphasized and make sure it appears in <strong> in the notes.
+- Every term that was bolded, highlighted, or underlined in the source must appear in <strong> in your notes.
 - Do not invent facts. Only use what is in the source.
-- Aim for length proportional to the source. Short sources get short notes; long sources get long notes.
+- Aim for length proportional to the source. Short sources get short notes; long sources get long notes. Do not truncate.
 
-Respond ONLY with JSON: {"title":"short descriptive title","html":"<h2>Section</h2><p>...</p>"}. Use only these HTML tags: h2, h3, p, ul, ol, li, strong, em. Do not include a top-level h1.`,,
-        userPrompt: text.slice(0, 12000),
+Respond ONLY with JSON: {"title":"short descriptive title","html":"<h2>Section</h2><p>...</p>"}. Use only these HTML tags: h2, h3, p, ul, ol, li, strong, em, u, mark. Do not include a top-level h1.`;
+
+async function generateNotes(sourceContent) {
+  if (process.env.GROQ_API_KEY) {
+    try {
+      const content = await callAI({
+        systemPrompt: NOTES_SYSTEM_PROMPT,
+        userPrompt: sourceContent.slice(0, 24000),
         jsonMode: true,
       });
       const parsed = JSON.parse(content);
@@ -77,7 +108,9 @@ Respond ONLY with JSON: {"title":"short descriptive title","html":"<h2>Section</
       console.warn('Groq notes generation failed, falling back:', e.message);
     }
   }
-  return { ...heuristicNotes(text), source: 'heuristic' };
+  // Fallback: strip tags, then run the heuristic
+  const plain = sourceContent.replace(/<[^>]+>/g, ' ');
+  return { ...heuristicNotes(plain), source: 'heuristic' };
 }
 
 function heuristicNotes(text) {
@@ -135,10 +168,11 @@ router.post('/flashcards', validate(z.object({ text: z.string().trim().min(20, '
   res.json({ cards, source });
 }));
 
-/* ---------- Notes (pasted text) ---------- */
+/* ---------- Notes (pasted text — may be HTML) ---------- */
 
 router.post('/notes', validate(z.object({ text: z.string().trim().min(50, 'Paste at least a paragraph of source text') })), wrap(async (req, res) => {
-  res.json(await generateNotes(req.body.text));
+  const normalized = normalizeHtml(req.body.text);
+  res.json(await generateNotes(normalized));
 }));
 
 /* ---------- Notes (uploaded file) ---------- */
@@ -146,17 +180,28 @@ router.post('/notes', validate(z.object({ text: z.string().trim().min(50, 'Paste
 router.post('/notes/upload', upload.single('file'), wrap(async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
-  let text = '';
+  const name = (req.file.originalname || '').toLowerCase();
+  let content = '';
+
   try {
-    text = await parseOfficeAsync(req.file.buffer);
+    if (name.endsWith('.docx')) {
+      // mammoth preserves bold/italic/headings/lists as HTML
+      const result = await mammoth.convertToHtml({ buffer: req.file.buffer });
+      content = normalizeHtml(result.value);
+    } else {
+      // officeparser for pdf/pptx/txt/etc — plain text only, no formatting
+      content = await parseOfficeAsync(req.file.buffer);
+    }
   } catch (e) {
     return res.status(422).json({ error: `Could not read that file (${e.message}). Try .docx, .pptx, .pdf, or .txt.` });
   }
 
-  text = (text || '').trim();
-  if (text.length < 50) return res.status(422).json({ error: 'That file has too little text to work with.' });
+  content = (content || '').trim();
+  if (content.replace(/<[^>]+>/g, '').trim().length < 50) {
+    return res.status(422).json({ error: 'That file has too little text to work with.' });
+  }
 
-  res.json(await generateNotes(text));
+  res.json(await generateNotes(content));
 }));
 
 export default router;
