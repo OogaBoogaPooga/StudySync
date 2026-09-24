@@ -6,13 +6,13 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
-  root: 'client',
+  root: '.',
   plugins: [react()],
   resolve: {
-    alias: { '@': path.resolve(__dirname, 'client/src') },
+    alias: { '@': path.resolve(__dirname, 'src') },
   },
   build: {
-    outDir: '../dist',
+    outDir: 'dist',
     emptyOutDir: true,
     // Code-splitting: heavy libraries load only on the pages that need them
     rollupOptions: {
@@ -27,6 +27,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    allowedHosts: true,
     proxy: {
       '/api': 'http://localhost:4000',
       '/socket.io': { target: 'http://localhost:4000', ws: true },
