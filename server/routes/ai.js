@@ -227,11 +227,11 @@ router.post('/notes/upload', upload.single('file'), wrap(async (req, res) => {
 
   try {
     if (name.endsWith('.docx')) {
-      // mammoth preserves bold/italic/headings/lists as HTML
       const result = await mammoth.convertToHtml({ buffer: req.file.buffer });
       content = normalizeHtml(result.value);
+    } else if (name.endsWith('.pdf')) {
+      content = await extractPdfHtml(req.file.buffer);
     } else {
-      // officeparser for pdf/pptx/txt/etc — plain text only, no formatting
       content = await parseOfficeAsync(req.file.buffer);
     }
   } catch (e) {
