@@ -24,7 +24,7 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 
 app.use(cors());
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '10mb' }));
 
 // API routes
 app.get('/api/health', (_req, res) => res.json({ ok: true, time: new Date().toISOString() }));
