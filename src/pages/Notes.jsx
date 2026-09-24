@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Layers, Trash2, Sparkles, UploadCloud, Type } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -6,7 +6,7 @@ import { api, getToken } from '@/lib/api.js';
 import { useApp } from '@/lib/store.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card.jsx';
-import { Input, Textarea, Label } from '@/components/ui/input.jsx';
+import { Input, Label } from '@/components/ui/input.jsx';
 import { Dialog, DialogContent } from '@/components/ui/dialog.jsx';
 
 export default function Notes() {
@@ -76,15 +76,18 @@ export default function Notes() {
 
 function AINotesDialog({ open, onClose, onCreated }) {
   const { toast } = useApp();
-  const [mode, setMode] = useState('paste'); // 'paste' | 'upload'
-  const [source, setSource] = useState('');
+  const [mode, setMode] = useState('paste');
   const [file, setFile] = useState(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
   const [title, setTitle] = useState('');
+  const pasteRef = useRef(null);
 
   useEffect(() => {
-    if (open) { setMode('paste'); setSource(''); setFile(null); setResult(null); setTitle(''); setBusy(false); }
+    if (open) {
+      setMode('paste'); setFile(null); setResult(null); setTitle(''); setBusy(false);
+      if (pasteRef.current) pasteRef.current.innerHTML = '';
+    }
   }, [open]);
 
   const generate = async () => {
@@ -104,7 +107,10 @@ function AINotesDialog({ open, onClose, onCreated }) {
         if (!res.ok) throw new Error(data.error || `Upload failed (${res.status})`);
         r = data;
       } else {
-        r = await api('/ai/notes', { method: 'POST', body: { text: source } });
+        const html = pasteRef.current?.innerHTML || '';
+        const plainLength = html.replace(/<[^>]+>/g, '').trim().length;
+        if (plainLength < 50) throw new Error('Paste at least a paragraph of source text');
+        r = await api('/ai/notes', { method: 'POST', body: { text: html } });
       }
       setResult(r);
       setTitle(r.title);
@@ -113,13 +119,16 @@ function AINotesDialog({ open, onClose, onCreated }) {
 
   const save = async () => {
     try {
-      const s = await api('/sets', { method: 'POST', body: { title: title || 'AI notes', content: result.html } });
+      const s = await api('/sets', { method: 'POST', body: { title: title || 'AI notes' } });
+      await api(`/sets/${s.id}`, { method: 'PUT', body: { content: result.html } });
       toast('Study set created');
       onCreated(s);
     } catch (e) { toast(e.message, 'error'); }
   };
 
-  const canGenerate = mode === 'paste' ? source.trim().length >= 50 : !!file;
+  const canGenerate = mode === 'paste'
+    ? (pasteRef.current?.innerText?.trim().length || 0) >= 50
+    : !!file;
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -132,12 +141,21 @@ function AINotesDialog({ open, onClose, onCreated }) {
             </div>
 
             {mode === 'paste' ? (
-              <Textarea rows={10} value={source} onChange={(e) => setSource(e.target.value)} placeholder="Paste your source material here…" aria-label="Source text" />
+              <div
+                ref={pasteRef}
+                contentEditable
+                suppressContentEditableWarning
+                role="textbox"
+                aria-multiline
+                aria-label="Source text"
+                data-placeholder="Paste your source material here — bold, highlight, and formatting are preserved…"
+                className="prose-editor min-h-[240px] max-h-[400px] overflow-y-auto rounded-md border bg-background p-4 text-sm outline-none focus:ring-2 focus:ring-ring"
+              />
             ) : (
               <label className="flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-10 cursor-pointer hover:bg-accent/40 transition">
                 <UploadCloud className="h-8 w-8 text-muted-foreground mb-2" />
                 <span className="text-sm font-medium">{file ? file.name : 'Click to choose a file'}</span>
-                <span className="text-xs text-muted-foreground mt-1">.docx, .pptx, .pdf, .txt, .md up to 10 MB</span>
+                <span className="text-xs text-muted-foreground mt-1">.docx (keeps formatting), .pdf, .pptx, .txt up to 10 MB</span>
                 <input
                   type="file"
                   className="hidden"
@@ -151,7 +169,7 @@ function AINotesDialog({ open, onClose, onCreated }) {
               <Sparkles className="h-4 w-4" />{busy ? 'Reading…' : 'Generate notes'}
             </Button>
             <p className="text-xs text-muted-foreground text-center">
-              {mode === 'paste' ? 'Needs at least a paragraph of source text.' : 'Word, PowerPoint, PDF, or plain text — text gets extracted and sent to the AI.'}
+              {mode === 'paste' ? 'Pasting from Word or Google Docs keeps your bold and highlights.' : '.docx files keep bold and headings. PDF and PPTX come through as plain text.'}
             </p>
           </div>
         ) : (
