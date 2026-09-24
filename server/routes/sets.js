@@ -18,8 +18,8 @@ setRoutes.get('/', wrap(async (req, res) => {
   res.json(sets);
 }));
 
-setRoutes.post('/', validate(z.object({ title: z.string().trim().min(1).max(100) })), wrap(async (req, res) => {
-  const set = await prisma.studySet.create({ data: { title: req.body.title, userId: req.user.id } });
+setRoutes.post('/', validate(z.object({ title: z.string().trim().min(1).max(100), content: z.string().max(200000).optional() })), wrap(async (req, res) => {
+  const set = await prisma.studySet.create({ data: { title: req.body.title, content: req.body.content || '', userId: req.user.id } });
   res.status(201).json(set);
 }));
 
