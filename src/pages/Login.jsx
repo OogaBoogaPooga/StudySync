@@ -29,7 +29,7 @@ export default function Login() {
         <div className="mb-6 flex flex-col items-center text-center">
           <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-slate-700 to-slate-500 text-white shadow-lg"><Sparkles /></div>
           <h1 className="mt-3 text-2xl font-bold gradient-text">StudySync</h1>
-          <p className="text-sm text-muted-foreground">Your calm, collaborative study companion</p>
+          <p className="text-sm text-muted-foreground">Built for students who actually want to focus.</p>
         </div>
 
         <div className="mb-5 grid grid-cols-2 rounded-lg bg-muted p-1 text-sm" role="tablist">
