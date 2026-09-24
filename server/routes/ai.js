@@ -78,6 +78,11 @@ function extractPdfHtml(buffer) {
       try {
         const out = [];
         for (const page of data.Pages || []) {
+          // Build a font-name lookup so we can detect bold by name when the flag is missing
+          const fontMap = {};
+          for (const f of page.Fonts || []) {
+            fontMap[f.id] = (f.name || '').toLowerCase();
+          }
           const lines = {};
           for (const text of page.Texts || []) {
             const y = Math.round(text.y * 5) / 5;
@@ -86,8 +91,15 @@ function extractPdfHtml(buffer) {
               let t = '';
               try { t = decodeURIComponent(run.T || ''); } catch { t = run.T || ''; }
               if (!t) continue;
-              const bold = !!(run.TS && run.TS[2]);
-              const italic = !!(run.TS && run.TS[3]);
+              const ts = run.TS || [];
+              const fontName = fontMap[ts[0]] || '';
+              // Detect bold via flag OR font name
+              const boldByFlag = !!ts[2];
+              const boldByName = /bold|black|heavy|semibold|demi|bd\b/.test(fontName);
+              const italicByFlag = !!ts[3];
+              const italicByName = /italic|oblique|it\b/.test(fontName);
+              const bold = boldByFlag || boldByName;
+              const italic = italicByFlag || italicByName;
               if (bold) t = `<strong>${t}</strong>`;
               else if (italic) t = `<em>${t}</em>`;
               lines[y].push(t);
