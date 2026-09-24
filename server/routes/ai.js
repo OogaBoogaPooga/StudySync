@@ -19,7 +19,7 @@ const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 /** Shared helper for calling Groq via its OpenAI-compatible endpoint */
 async function callAI({ systemPrompt, userPrompt, jsonMode = false }) {
   const body = {
-    model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+    model: process.env.GROQ_MODEL || 'openai/gpt-oss-120b',
     temperature: 0.3,
     messages: [
       { role: 'system', content: systemPrompt },
