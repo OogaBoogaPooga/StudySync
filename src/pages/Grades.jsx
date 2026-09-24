@@ -50,7 +50,7 @@ export default function Grades() {
       </div>
 
       <div className="grid md:grid-cols-3 gap-4">
-        <Card className="md:col-span-1 bg-gradient-to-br from-indigo-500 to-violet-600 text-white border-0 shadow-lg">
+        <Card className="md:col-span-1 bg-gradient-to-br from-slate-700 to-slate-600 text-white border-0 shadow-lg">
           <CardContent className="p-6"><p className="text-sm opacity-80">Weighted GPA</p><p className="text-5xl font-bold mt-1">{gpa == null ? '—' : gpa.toFixed(2)}</p><p className="text-xs opacity-80 mt-2">{graded.length} classes with grades · {graded.reduce((s, p) => s + p.cls.credits, 0)} credits</p></CardContent>
         </Card>
         <Card className="md:col-span-2">
