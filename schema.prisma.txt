@@ -1,0 +1,78 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String         @id @default(cuid())
+  email       String         @unique
+  name        String
+  password    String // bcrypt hash
+  createdAt   DateTime       @default(now())
+  classes     Class[]
+  assignments Assignment[]
+  sessions    StudySession[]
+  studySets   StudySet[]
+}
+
+model Class {
+  id          String       @id @default(cuid())
+  name        String
+  color       String       @default("#6366f1") // accent color per subject
+  credits     Float        @default(3) // used for weighted GPA
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignments Assignment[]
+}
+
+model Assignment {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  dueDate     DateTime
+  progress    Int      @default(0) // 0-100
+  completed   Boolean  @default(false)
+  // Grade fields (null score = not graded yet)
+  score       Float?
+  maxScore    Float    @default(100)
+  weight      Float    @default(1) // relative weight inside the class
+  classId     String?
+  class       Class?   @relation(fields: [classId], references: [id], onDelete: SetNull)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+}
+
+model StudySession {
+  id          String   @id @default(cuid())
+  type        String   @default("focus") // focus | break
+  durationMin Int
+  notes       String?
+  startedAt   DateTime @default(now())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model StudySet {
+  id        String      @id @default(cuid())
+  title     String
+  content   String      @default("") // rich-text HTML
+  shareId   String      @unique @default(cuid()) // public share link token
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cards     Flashcard[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+model Flashcard {
+  id    String   @id @default(cuid())
+  front String
+  back  String
+  setId String
+  set   StudySet @relation(fields: [setId], references: [id], onDelete: Cascade)
+}
