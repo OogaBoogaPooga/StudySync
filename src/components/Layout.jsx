@@ -26,7 +26,7 @@ export default function Layout() {
       {/* Desktop sidebar */}
       <aside className="hidden md:flex md:w-60 md:flex-col border-r bg-card/60 backdrop-blur sticky top-0 h-screen no-print">
         <div className="flex items-center gap-2 px-5 py-5">
-          <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white shadow-md"><Sparkles className="h-5 w-5" /></div>
+          <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-slate-700 to-slate-500 text-white shadow-md"><Sparkles className="h-5 w-5" /></div>
           <span className="text-lg font-bold gradient-text">StudySync</span>
         </div>
         <nav aria-label="Main" className="flex-1 space-y-1 px-3">
