@@ -113,8 +113,7 @@ function AINotesDialog({ open, onClose, onCreated }) {
 
   const save = async () => {
     try {
-      const s = await api('/sets', { method: 'POST', body: { title: title || 'AI notes' } });
-      await api(`/sets/${s.id}`, { method: 'PUT', body: { content: result.html } });
+      const s = await api('/sets', { method: 'POST', body: { title: title || 'AI notes', content: result.html } });
       toast('Study set created');
       onCreated(s);
     } catch (e) { toast(e.message, 'error'); }
