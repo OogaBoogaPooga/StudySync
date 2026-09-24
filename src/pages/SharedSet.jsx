@@ -16,7 +16,7 @@ export default function SharedSet() {
   useEffect(() => { api(`/share/${shareId}`).then(setSet).catch((e) => setError(e.message)); }, [shareId]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-violet-50 to-sky-50 dark:from-slate-950 dark:via-indigo-950 dark:to-slate-900 p-4 md:p-10">
+    <div className="min-h-screen bg-gradient-to-br from-stone-100 via-stone-50 to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 p-4 md:p-10">
       <div className="mx-auto max-w-3xl space-y-4 animate-fade-in">
         <Link to="/" className="inline-flex items-center gap-2 font-bold gradient-text"><Sparkles className="h-5 w-5 text-indigo-500" />StudySync</Link>
         {error && <Card><CardContent className="p-6 text-destructive">{error}</CardContent></Card>}
