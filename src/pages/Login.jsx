@@ -24,10 +24,10 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen grid place-items-center bg-gradient-to-br from-indigo-50 via-violet-50 to-sky-50 dark:from-slate-950 dark:via-indigo-950 dark:to-slate-900 p-4">
+    <div className="min-h-screen grid place-items-center bg-gradient-to-br from-stone-100 via-stone-50 to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 p-4">
       <div className="w-full max-w-md rounded-2xl border bg-card p-8 shadow-2xl animate-fade-in">
         <div className="mb-6 flex flex-col items-center text-center">
-          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white shadow-lg"><Sparkles /></div>
+          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-slate-700 to-slate-500 text-white shadow-lg"><Sparkles /></div>
           <h1 className="mt-3 text-2xl font-bold gradient-text">StudySync</h1>
           <p className="text-sm text-muted-foreground">Your calm, collaborative study companion</p>
         </div>
