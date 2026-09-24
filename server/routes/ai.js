@@ -65,6 +65,48 @@ function normalizeHtml(html) {
     .replace(/<p>\s*<\/p>/gi, '')
     .replace(/<br\s*\/?>/gi, ' ');
 }
+/**
+ * Extracts text from a PDF while preserving bold and italic runs.
+ * Uses font-name inspection — works when the PDF embeds named fonts like
+ * "Arial-BoldMT". Won't work for scanned PDFs or obfuscated fonts.
+ */
+function extractPdfHtml(buffer) {
+  return new Promise((resolve, reject) => {
+    const parser = new PDFParser();
+    parser.on('pdfParser_dataError', (err) => reject(new Error(err?.parserError || 'PDF parse error')));
+    parser.on('pdfParser_dataReady', (data) => {
+      try {
+        const out = [];
+        for (const page of data.Pages || []) {
+          const lines = {};
+          for (const text of page.Texts || []) {
+            const y = Math.round(text.y * 5) / 5;
+            if (!lines[y]) lines[y] = [];
+            for (const run of text.R || []) {
+              let t = '';
+              try { t = decodeURIComponent(run.T || ''); } catch { t = run.T || ''; }
+              if (!t) continue;
+              const bold = !!(run.TS && run.TS[2]);
+              const italic = !!(run.TS && run.TS[3]);
+              if (bold) t = `<strong>${t}</strong>`;
+              else if (italic) t = `<em>${t}</em>`;
+              lines[y].push(t);
+            }
+          }
+          const ordered = Object.keys(lines).map(Number).sort((a, b) => b - a);
+          for (const y of ordered) {
+            const line = lines[y].join('').trim();
+            if (line) out.push(`<p>${line}</p>`);
+          }
+        }
+        resolve(out.join(''));
+      } catch (e) {
+        reject(e);
+      }
+    });
+    parser.parseBuffer(buffer);
+  });
+}
 
 const NOTES_SYSTEM_PROMPT = `You are creating thorough, professional study notes for a student preparing for an AP-level exam (APUSH, AP Lang, AP Bio, AP World, AP Government, etc.). Your notes must be comprehensive enough to serve as the only study material the student needs.
 
