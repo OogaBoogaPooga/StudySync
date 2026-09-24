@@ -9,13 +9,13 @@
     --foreground: 230 30% 12%;
     --card: 0 0% 100%;
     --card-foreground: 230 30% 12%;
-    --primary: 243 75% 59%;          /* indigo-500 */
+    --primary: 207 25% 45%;          /* nordic*/
     --primary-foreground: 0 0% 100%;
     --secondary: 232 40% 94%;
     --secondary-foreground: 230 30% 20%;
     --muted: 230 25% 93%;
     --muted-foreground: 230 12% 42%;
-    --accent: 262 83% 96%;
+    --accent: 110 20% 90%;
     --accent-foreground: 262 60% 35%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
@@ -29,13 +29,13 @@
     --foreground: 228 30% 94%;
     --card: 232 28% 12%;
     --card-foreground: 228 30% 94%;
-    --primary: 243 80% 68%;
+    --primary: 207 35% 62%;
     --primary-foreground: 232 30% 8%;
     --secondary: 232 22% 18%;
     --secondary-foreground: 228 30% 94%;
     --muted: 232 20% 17%;
     --muted-foreground: 228 15% 66%;
-    --accent: 262 40% 22%;
+    --accent: 110 15% 25%;
     --accent-foreground: 262 90% 88%;
     --destructive: 0 70% 60%;
     --destructive-foreground: 0 0% 100%;
@@ -63,7 +63,7 @@ h1, h2, h3, .font-display { font-family: 'Fraunces', Georgia, serif; font-variat
 }
 
 @layer components {
-  .gradient-text { @apply bg-gradient-to-r from-indigo-500 via-violet-500 to-purple-500 bg-clip-text text-transparent; }
+  .gradient-text { @apply bg-gradient-to-r from-slate-700 via-slate-600 to-slate-500 bg-clip-text text-transparent; } .dark .gradient-text { @apply bg-gradient-to-r from-slate-100 via-slate-300 to-slate-400 bg-clip-text text-transparent; }
   .glass { @apply bg-card/80 backdrop-blur border shadow-sm; }
   .skip-link { @apply sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-primary-foreground; }
   /* Rich text editor typography */
