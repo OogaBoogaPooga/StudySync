@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* shadcn/ui design tokens — calm blue/purple palette */
+/* shadcn/ui design tokens — Nordic palette */
 @layer base {
   :root {
     --background: 228 40% 98%;
@@ -16,12 +16,12 @@
     --muted: 230 25% 93%;
     --muted-foreground: 230 12% 42%;
     --accent: 110 20% 90%;
-    --accent-foreground: 262 60% 35%;
+    --accent-foreground: 110 25% 25%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
     --border: 230 25% 88%;
     --input: 230 25% 86%;
-    --ring: 243 75% 59%;
+    --ring: 207 25% 45%;
     --radius: 0.75rem;
   }
   .dark {
@@ -41,20 +41,20 @@
     --destructive-foreground: 0 0% 100%;
     --border: 232 20% 22%;
     --input: 232 20% 24%;
-    --ring: 243 80% 68%;
+    --ring: 207 35% 62%;
   }
   /* High-contrast mode (WCAG AAA-leaning) */
-  .contrast {
-    --border: 230 30% 55%;
-    --muted-foreground: 230 20% 30%;
-    --primary: 243 90% 45%;
+ .contrast {
+    --border: 220 15% 55%;
+    --muted-foreground: 220 12% 30%;
+    --primary: 207 35% 35%;
   }
   .contrast.dark {
-    --border: 230 30% 60%;
-    --muted-foreground: 228 20% 80%;
-    --primary: 243 100% 78%;
+    --border: 220 15% 60%;
+    --muted-foreground: 40 12% 82%;
+    --primary: 207 40% 75%;
   }
-
+  
   * { @apply border-border; }
   body { @apply bg-background text-foreground antialiased; font-family: 'Inter Tight', ui-sans-serif, system-ui, sans-serif; }
 h1, h2, h3, .font-display { font-family: 'Fraunces', Georgia, serif; font-variation-settings: 'SOFT' 40, 'WONK' 1; letter-spacing: -0.01em; }
