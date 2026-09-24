@@ -4,7 +4,6 @@ import * as officeparserModule from 'officeparser';
 import { z } from 'zod';
 import { requireAuth, validate, wrap } from '../middleware/auth.js';
 
-// Works across officeparser versions (named export vs default export)
 const parseOfficeAsync =
   officeparserModule.parseOfficeAsync ||
   officeparserModule.default?.parseOfficeAsync ||
@@ -15,12 +14,12 @@ router.use(requireAuth);
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
-/** Shared helper for calling Gemini via its OpenAI-compatible endpoint */
-async function callGemini({ systemPrompt, userPrompt, jsonMode = false }) {
+/** Shared helper for calling Groq via its OpenAI-compatible endpoint */
+async function callAI({ systemPrompt, userPrompt, jsonMode = false }) {
   const body = {
-    model: process.env.GEMINI_MODEL || 'gemini-3.8-flash',
+    model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
     temperature: 0.3,
     messages: [
       { role: 'system', content: systemPrompt },
@@ -29,17 +28,17 @@ async function callGemini({ systemPrompt, userPrompt, jsonMode = false }) {
   };
   if (jsonMode) body.response_format = { type: 'json_object' };
 
-  const res = await fetch(GEMINI_URL, {
+  const res = await fetch(GROQ_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.GEMINI_API_KEY}`,
+      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
     },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
     const detail = await res.text().catch(() => '');
-    throw new Error(`Gemini error (${res.status}): ${detail.slice(0, 200)}`);
+    throw new Error(`Groq error (${res.status}): ${detail.slice(0, 200)}`);
   }
   const data = await res.json();
   return data.choices[0].message.content;
@@ -47,9 +46,9 @@ async function callGemini({ systemPrompt, userPrompt, jsonMode = false }) {
 
 /** Turns arbitrary source text into structured HTML notes */
 async function generateNotes(text) {
-  if (process.env.GEMINI_API_KEY) {
+  if (process.env.GROQ_API_KEY) {
     try {
-      const content = await callGemini({
+      const content = await callAI({
         systemPrompt: `You turn source material into clean, organized study notes for a student. Respond ONLY with JSON: {"title":"short descriptive title","html":"<h2>Section</h2><p>...</p><ul><li>...</li></ul>"}. Use only these HTML tags: h2, h3, p, ul, ol, li, strong, em. Do not include a top-level h1. Keep it concise — the goal is a study guide, not a full rewrite.`,
         userPrompt: text.slice(0, 12000),
         jsonMode: true,
@@ -57,7 +56,7 @@ async function generateNotes(text) {
       const parsed = JSON.parse(content);
       if (parsed.html) return { title: parsed.title || 'AI notes', html: parsed.html, source: 'ai' };
     } catch (e) {
-      console.warn('Gemini notes generation failed, falling back:', e.message);
+      console.warn('Groq notes generation failed, falling back:', e.message);
     }
   }
   return { ...heuristicNotes(text), source: 'heuristic' };
@@ -98,9 +97,9 @@ router.post('/flashcards', validate(z.object({ text: z.string().trim().min(20, '
   let cards = [];
   let source = 'heuristic';
 
-  if (process.env.GEMINI_API_KEY) {
+  if (process.env.GROQ_API_KEY) {
     try {
-      const content = await callGemini({
+      const content = await callAI({
         systemPrompt: `You are a study assistant. Summarize the student's notes into up to ${max} high-quality flashcards. Respond ONLY with JSON: {"cards":[{"front":"question","back":"concise answer"}]}. Questions should test understanding, not trivia. Keep answers under 40 words.`,
         userPrompt: text.slice(0, 12000),
         jsonMode: true,
@@ -109,7 +108,7 @@ router.post('/flashcards', validate(z.object({ text: z.string().trim().min(20, '
       cards = (parsed.cards || []).filter((c) => c.front && c.back).slice(0, max);
       source = 'ai';
     } catch (e) {
-      console.warn('Gemini flashcard generation failed, falling back:', e.message);
+      console.warn('Groq flashcard generation failed, falling back:', e.message);
     }
   }
 
