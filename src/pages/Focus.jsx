@@ -96,7 +96,7 @@ export default function Focus() {
   return (
     <div className="grid lg:grid-cols-[1fr_360px] gap-6">
       <div className="space-y-6">
-        <Card className={`text-center overflow-hidden ${mode === 'focus' ? 'bg-gradient-to-br from-indigo-500/10 to-violet-500/10' : 'bg-gradient-to-br from-emerald-500/10 to-sky-500/10'}`}>
+        <Card className={`text-center overflow-hidden ${mode === 'focus' ? 'bg-gradient-to-br from-slate-500/10 to-slate-400/10' : 'bg-gradient-to-br from-slate-500/10 to-slate-400/10'}`}>
           <CardContent className="p-8 flex flex-col items-center gap-5">
             <div className="flex gap-1 rounded-full bg-muted p-1 text-xs" role="tablist">
               {[['focus', 'Focus'], ['short', 'Short break'], ['long', 'Long break']].map(([m, l]) => (
