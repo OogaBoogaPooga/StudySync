@@ -69,7 +69,7 @@ export default function Dashboard() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold">Hey {user?.name?.split(' ')[0]} 👋</h1>
+          <h1 className="text-2xl md:text-3xl font-bold font-display">Welcome back, {user?.name?.split(' ')[0]}</h1>
           <p className="text-muted-foreground text-sm">{stats.late ? `${stats.late} late · ` : ''}{stats.soon} due in 24h · {stats.done}/{stats.total} complete</p>
         </div>
         <div className="flex gap-2">
@@ -137,7 +137,7 @@ export default function Dashboard() {
             </Card>
           );
         })}
-        {!visible.length && <p className="text-muted-foreground text-sm col-span-full py-10 text-center">Nothing here. Enjoy the free time 🎉</p>}
+        {!visible.length && <p className="text-muted-foreground text-sm col-span-full py-10 text-center">Nothing here. Enjoy the free time.</p>}
       </div>
 
       <AssignmentDialog editing={editing} classes={classes} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />
