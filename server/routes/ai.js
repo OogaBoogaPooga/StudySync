@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
-import mammoth from 'mammoth';
+import mammoth from 'mammoth'; import PDFParser from 'pdf2json';
 import * as officeparserModule from 'officeparser';
 import { z } from 'zod';
 import { requireAuth, validate, wrap } from '../middleware/auth.js';
