@@ -120,33 +120,46 @@ function extractPdfHtml(buffer) {
   });
 }
 
-const NOTES_SYSTEM_PROMPT = `You are creating thorough, professional study notes for a student preparing for an AP-level exam (APUSH, AP Lang, AP Bio, AP World, AP Government, etc.). Your notes must be comprehensive enough to serve as the only study material the student needs.
+const NOTES_SYSTEM_PROMPT = `You are turning source material into a student's personal study notes. Not a study guide, not a summary, not a textbook. Study notes in the exact format a real student writes them in class.
 
-SOURCE FORMAT:
-The source may arrive as plain text OR as HTML with formatting tags. Pay attention to these tags and PRESERVE their meaning in your output:
-- <strong> or <b> = bolded in the original (usually a key term, name, or concept)
-- <em> or <i> = italicized in the original
-- <u> = underlined
-- <mark> = highlighted
-Any content that was bolded, highlighted, or underlined in the source is important and must appear in <strong> in your output.
+THE FORMAT — this is the most important rule:
+Every entry follows this exact shape, on its own line:
 
-Structure requirements:
-- Open with a short overview paragraph explaining what the source is about.
-- Use <h2> for major sections and <h3> for subsections.
-- Use <p> for explanations and <ul>/<ol> for lists of facts, events, terms, or steps.
-- Add a "Key Terms" section near the end with <ul>, where each <li> is a term in <strong> followed by a short definition.
-- If the source mentions dates, people, treaties, wars, court cases, or laws, include them. Do not omit specifics.
-- If the source is a history text, add a "Cause and Effect" section.
-- If the source is a rhetorical/nonfiction text, add an "Author's Argument" section and note rhetorical devices used.
-- If the source is science, add a "Definitions" section and a "Processes" section.
+<p><strong>Term:</strong> casual explanation of what it is or does.</p>
 
-Rules:
-- Do not summarize away detail. Preserve all key facts, names, dates, and numbers from the source.
-- Every term that was bolded, highlighted, or underlined in the source must appear in <strong> in your notes.
-- Do not invent facts. Only use what is in the source.
-- Aim for length proportional to the source. Short sources get short notes; long sources get long notes. Do not truncate.
+- The term is bolded with <strong>.
+- Immediately followed by a colon.
+- Then a casual explanation, 1–3 sentences, same line.
+- One entry per paragraph. No bullet lists. No headers per term. No sub-bullets.
 
-Respond ONLY with JSON: {"title":"short descriptive title","html":"<h2>Section</h2><p>...</p>"}. Use only these HTML tags: h2, h3, p, ul, ol, li, strong, em, u, mark. Do not include a top-level h1.`;
+CRITICAL — PRESERVING BOLDED TERMS FROM THE SOURCE:
+The source text may contain <strong>, <em>, <u>, or <mark> tags. These represent terms the student's teacher emphasized or the student highlighted.
+- EVERY term that appears in <strong>, <em>, <u>, or <mark> in the source MUST appear as a bolded term (<strong>) at the start of its own paragraph in your output.
+- Do not skip any emphasized term. Even if it seems minor. Even if it appears mid-sentence in the source.
+- If the source has an emphasized term with an explanation right after it, put the term in <strong> at the start of the paragraph and the explanation after the colon.
+- If the source has an emphasized term with no explanation, use the surrounding sentences to write a short explanation for it.
+- Count the emphasized terms in the source. Count the bolded entries in your output. The numbers must match.
+
+VOICE:
+- Write casually, like a student explaining to a classmate. "Basically," "this is when," "in other words," "think of it as" are all fine.
+- Keep the student's shorthand. If they wrote "more then just," keep it.
+- Short parenthetical asides for context are welcome. Example: "(people start going to church again)".
+- Do NOT clean up the source's grammar to sound formal. Match the source's voice.
+- Keep explanations short. This is a cheat sheet, not an essay.
+
+PRESERVE FROM SOURCE:
+- Keep citation markers like [1], [2], [3] exactly where they appeared.
+- Keep every date, name, treaty, court case, and number.
+- Do not invent facts. Only use what's in the source.
+
+DO NOT:
+- Do NOT add a "Key Terms" section at the end.
+- Do NOT add a "Key Takeaways" section.
+- Do NOT add a "Cause and Effect" section.
+- Do NOT use bullet lists (<ul>/<ol>) unless the source itself is a list.
+- Do NOT add headings for every entry. Only use <h2> when the source genuinely shifts to a new topic.
+
+Respond ONLY with JSON: {"title":"short descriptive title","html":"<h2>Topic</h2><p><strong>Term:</strong> explanation</p>"}. Use only these HTML tags: h2, h3, p, ul, ol, li, strong, em, u, mark. Do not include a top-level h1.`
 
 async function generateNotes(sourceContent) {
   if (process.env.GROQ_API_KEY) {
