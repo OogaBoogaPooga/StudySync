@@ -20,7 +20,7 @@ export default function StudySet() {
   const saveTimer = useRef(null);
 
   useEffect(() => {
-    api(`/sets/${id}`).then((s) => { setSet(s); if (editorRef.current) editorRef.current.innerHTML = s.content; }).catch((e) => toast(e.message, 'error'));
+    api(`/sets/${id}`).then(setSet).catch((e) => toast(e.message, 'error'));
   }, [id]);
 
   // Debounced auto-save of rich text content
@@ -32,6 +32,11 @@ export default function StudySet() {
       catch (e) { setSaving('Save failed'); toast(e.message, 'error'); }
     }, 800);
   }, [id]);
+  useEffect(() => {
+    if (set && editorRef.current && editorRef.current.innerHTML === '') {
+      editorRef.current.innerHTML = set.content || '';
+    }
+  }, [set]);
 
   // Rich text commands via contentEditable
   const exec = (cmd, val) => { document.execCommand(cmd, false, val); editorRef.current?.focus(); onInput(); };
