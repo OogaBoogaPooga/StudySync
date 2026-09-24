@@ -28,7 +28,7 @@ export default function Notes() {
 
   return (
     <div className="space-y-6">
-      <div><h1 className="text-2xl font-bold">Notes & Flashcards</h1><p className="text-sm text-muted-foreground">Write rich notes, generate flashcards, and share sets with a link.</p></div>
+      <div><h1 className="text-2xl font-bold">Notes & Flashcards</h1><p className="text-sm text-muted-foreground">Notes, flashcards, and shareable links. No account needed to view.</p></div>
       <form onSubmit={create} className="flex gap-2"><Input placeholder="New study set title…" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={100} aria-label="New study set title" /><Button type="submit" variant="gradient"><Plus className="h-4 w-4" />Create</Button></form>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
