@@ -1,99 +1,68 @@
 import { Router } from 'express';
+import multer from 'multer';
+import * as officeparserModule from 'officeparser';
 import { z } from 'zod';
 import { requireAuth, validate, wrap } from '../middleware/auth.js';
+
+// Works across officeparser versions (named export vs default export)
+const parseOfficeAsync =
+  officeparserModule.parseOfficeAsync ||
+  officeparserModule.default?.parseOfficeAsync ||
+  officeparserModule.default;
 
 const router = Router();
 router.use(requireAuth);
 
-/**
- * Offline fallback: turns pasted notes into Q/A pairs using simple heuristics.
- *  - "Term: definition" or "Term - definition" lines become cards directly
- *  - Sentences containing "is/are/means" become "What is X?" cards
- */
-function heuristicCards(text, max = 12) {
-  const cards = [];
-  const plain = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-  for (const line of text.replace(/<[^>]+>/g, '\n').split(/\n+/)) {
-    const m = line.match(/^\s*([^:\-–]{2,60})\s*[:\-–]\s*(.{5,})$/);
-    if (m) cards.push({ front: `What is ${m[1].trim()}?`, back: m[2].trim() });
-  }
-  for (const sentence of plain.split(/(?<=[.!?])\s+/)) {
-    if (cards.length >= max) break;
-    const m = sentence.match(/^(?:The\s+)?([A-Z][\w\s-]{2,50}?)\s+(is|are|means|refers to)\s+(.{8,})$/i);
-    if (m) cards.push({ front: `What ${m[2].toLowerCase()} ${m[1].trim()}?`, back: sentence.trim() });
-  }
-  // Dedupe by question
-  const seen = new Set();
-  return cards.filter((c) => !seen.has(c.front) && seen.add(c.front)).slice(0, max);
-}
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-/** Calls an OpenAI-compatible chat endpoint and expects strict JSON back */
-async function aiCards(text, max = 12) {
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
+
+/** Shared helper for calling Gemini via its OpenAI-compatible endpoint */
+async function callGemini({ systemPrompt, userPrompt, jsonMode = false }) {
+  const body = {
+    model: process.env.GEMINI_MODEL || 'gemini-3.8-flash',
+    temperature: 0.3,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ],
+  };
+  if (jsonMode) body.response_format = { type: 'json_object' };
+
+  const res = await fetch(GEMINI_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-    body: JSON.stringify({
-      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-      temperature: 0.3,
-      response_format: { type: 'json_object' },
-      messages: [
-        {
-          role: 'system',
-          content: `You are a study assistant. Summarize the student's notes into up to ${max} high-quality flashcards. Respond ONLY with JSON: {"cards":[{"front":"question","back":"concise answer"}]}. Questions should test understanding, not trivia. Keep answers under 40 words.`,
-        },
-        { role: 'user', content: text.slice(0, 12000) },
-      ],
-    }),
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${process.env.GEMINI_API_KEY}`,
+    },
+    body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`AI provider error (${res.status})`);
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error(`Gemini error (${res.status}): ${detail.slice(0, 200)}`);
+  }
   const data = await res.json();
-  const parsed = JSON.parse(data.choices[0].message.content);
-  return (parsed.cards || []).filter((c) => c.front && c.back).slice(0, max);
+  return data.choices[0].message.content;
 }
 
-router.post('/flashcards', validate(z.object({ text: z.string().trim().min(20, 'Paste at least a few sentences'), max: z.coerce.number().int().min(1).max(30).default(12) })), wrap(async (req, res) => {
-  const { text, max } = req.body;
-  let cards = [];
-  let source = 'heuristic';
-  if (process.env.OPENAI_API_KEY) {
+/** Turns arbitrary source text into structured HTML notes */
+async function generateNotes(text) {
+  if (process.env.GEMINI_API_KEY) {
     try {
-      cards = await aiCards(text, max);
-      source = 'ai';
+      const content = await callGemini({
+        systemPrompt: `You turn source material into clean, organized study notes for a student. Respond ONLY with JSON: {"title":"short descriptive title","html":"<h2>Section</h2><p>...</p><ul><li>...</li></ul>"}. Use only these HTML tags: h2, h3, p, ul, ol, li, strong, em. Do not include a top-level h1. Keep it concise — the goal is a study guide, not a full rewrite.`,
+        userPrompt: text.slice(0, 12000),
+        jsonMode: true,
+      });
+      const parsed = JSON.parse(content);
+      if (parsed.html) return { title: parsed.title || 'AI notes', html: parsed.html, source: 'ai' };
     } catch (e) {
-      console.warn('AI generation failed, falling back:', e.message);
+      console.warn('Gemini notes generation failed, falling back:', e.message);
     }
   }
-  if (!cards.length) cards = heuristicCards(text, max);
-  if (!cards.length) return res.status(422).json({ error: 'Could not extract flashcards. Try "Term: definition" lines or fuller sentences.' });
-  res.json({ cards, source });
-}));
-
-/** Calls OpenAI to turn source material into structured HTML notes */
-async function aiNotes(text) {
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-    body: JSON.stringify({
-      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-      temperature: 0.3,
-      response_format: { type: 'json_object' },
-      messages: [
-        {
-          role: 'system',
-          content: `You turn source material into clean, organized study notes for a student. Respond ONLY with JSON: {"title":"short descriptive title","html":"<h2>Section</h2><p>...</p><ul><li>...</li></ul>"}. Use only these HTML tags: h2, h3, p, ul, ol, li, strong, em. Do not include a top-level h1. Keep it concise — the goal is a study guide, not a full rewrite.`,
-        },
-        { role: 'user', content: text.slice(0, 12000) },
-      ],
-    }),
-  });
-  if (!res.ok) throw new Error(`AI provider error (${res.status})`);
-  const data = await res.json();
-  const parsed = JSON.parse(data.choices[0].message.content);
-  if (!parsed.html) throw new Error('AI returned no notes');
-  return { title: parsed.title || 'AI notes', html: parsed.html };
+  return { ...heuristicNotes(text), source: 'heuristic' };
 }
 
-/** Offline fallback when no API key is configured */
 function heuristicNotes(text) {
   const plain = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
   const sentences = plain.split(/(?<=[.!?])\s+/).slice(0, 60);
@@ -106,20 +75,71 @@ function heuristicNotes(text) {
   return { title, html: `<h2>Summary</h2>${paragraphs.join('')}` };
 }
 
-router.post('/notes', validate(z.object({ text: z.string().trim().min(50, 'Paste at least a paragraph of source text') })), wrap(async (req, res) => {
-  const { text } = req.body;
-  let result = null;
+/* ---------- Flashcards ---------- */
+
+function heuristicCards(text, max = 12) {
+  const cards = [];
+  const plain = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  for (const line of text.replace(/<[^>]+>/g, '\n').split(/\n+/)) {
+    const m = line.match(/^\s*([^:\-–]{2,60})\s*[:\-–]\s*(.{5,})$/);
+    if (m) cards.push({ front: `What is ${m[1].trim()}?`, back: m[2].trim() });
+  }
+  for (const sentence of plain.split(/(?<=[.!?])\s+/)) {
+    if (cards.length >= max) break;
+    const m = sentence.match(/^(?:The\s+)?([A-Z][\w\s-]{2,50}?)\s+(is|are|means|refers to)\s+(.{8,})$/i);
+    if (m) cards.push({ front: `What ${m[2].toLowerCase()} ${m[1].trim()}?`, back: sentence.trim() });
+  }
+  const seen = new Set();
+  return cards.filter((c) => !seen.has(c.front) && seen.add(c.front)).slice(0, max);
+}
+
+router.post('/flashcards', validate(z.object({ text: z.string().trim().min(20, 'Paste at least a few sentences'), max: z.coerce.number().int().min(1).max(30).default(12) })), wrap(async (req, res) => {
+  const { text, max } = req.body;
+  let cards = [];
   let source = 'heuristic';
-  if (process.env.OPENAI_API_KEY) {
+
+  if (process.env.GEMINI_API_KEY) {
     try {
-      result = await aiNotes(text);
+      const content = await callGemini({
+        systemPrompt: `You are a study assistant. Summarize the student's notes into up to ${max} high-quality flashcards. Respond ONLY with JSON: {"cards":[{"front":"question","back":"concise answer"}]}. Questions should test understanding, not trivia. Keep answers under 40 words.`,
+        userPrompt: text.slice(0, 12000),
+        jsonMode: true,
+      });
+      const parsed = JSON.parse(content);
+      cards = (parsed.cards || []).filter((c) => c.front && c.back).slice(0, max);
       source = 'ai';
     } catch (e) {
-      console.warn('AI notes failed, falling back:', e.message);
+      console.warn('Gemini flashcard generation failed, falling back:', e.message);
     }
   }
-  if (!result) result = heuristicNotes(text);
-  res.json({ ...result, source });
+
+  if (!cards.length) cards = heuristicCards(text, max);
+  if (!cards.length) return res.status(422).json({ error: 'Could not extract flashcards. Try "Term: definition" lines or fuller sentences.' });
+  res.json({ cards, source });
+}));
+
+/* ---------- Notes (pasted text) ---------- */
+
+router.post('/notes', validate(z.object({ text: z.string().trim().min(50, 'Paste at least a paragraph of source text') })), wrap(async (req, res) => {
+  res.json(await generateNotes(req.body.text));
+}));
+
+/* ---------- Notes (uploaded file) ---------- */
+
+router.post('/notes/upload', upload.single('file'), wrap(async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+  let text = '';
+  try {
+    text = await parseOfficeAsync(req.file.buffer);
+  } catch (e) {
+    return res.status(422).json({ error: `Could not read that file (${e.message}). Try .docx, .pptx, .pdf, or .txt.` });
+  }
+
+  text = (text || '').trim();
+  if (text.length < 50) return res.status(422).json({ error: 'That file has too little text to work with.' });
+
+  res.json(await generateNotes(text));
 }));
 
 export default router;
