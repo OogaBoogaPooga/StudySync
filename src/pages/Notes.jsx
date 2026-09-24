@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Layers, Trash2, Sparkles } from 'lucide-react';
+import { Plus, Layers, Trash2, Sparkles, UploadCloud, Type } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { api } from '@/lib/api.js';
+import { api, getToken } from '@/lib/api.js';
 import { useApp } from '@/lib/store.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card.jsx';
@@ -76,17 +76,36 @@ export default function Notes() {
 
 function AINotesDialog({ open, onClose, onCreated }) {
   const { toast } = useApp();
+  const [mode, setMode] = useState('paste'); // 'paste' | 'upload'
   const [source, setSource] = useState('');
+  const [file, setFile] = useState(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
   const [title, setTitle] = useState('');
 
-  useEffect(() => { if (open) { setSource(''); setResult(null); setTitle(''); setBusy(false); } }, [open]);
+  useEffect(() => {
+    if (open) { setMode('paste'); setSource(''); setFile(null); setResult(null); setTitle(''); setBusy(false); }
+  }, [open]);
 
   const generate = async () => {
     setBusy(true);
     try {
-      const r = await api('/ai/notes', { method: 'POST', body: { text: source } });
+      let r;
+      if (mode === 'upload') {
+        if (!file) { setBusy(false); return; }
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await fetch('/api/ai/notes/upload', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${getToken()}` },
+          body: fd,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `Upload failed (${res.status})`);
+        r = data;
+      } else {
+        r = await api('/ai/notes', { method: 'POST', body: { text: source } });
+      }
       setResult(r);
       setTitle(r.title);
     } catch (e) { toast(e.message, 'error'); } finally { setBusy(false); }
@@ -101,16 +120,40 @@ function AINotesDialog({ open, onClose, onCreated }) {
     } catch (e) { toast(e.message, 'error'); }
   };
 
+  const canGenerate = mode === 'paste' ? source.trim().length >= 50 : !!file;
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent title="AI notes maker" description="Paste an article, textbook section, or transcript. AI turns it into an organized study guide." className="max-w-2xl">
+      <DialogContent title="AI notes maker" description="Paste text or upload a file. AI turns it into an organized study guide." className="max-w-2xl">
         {!result ? (
-          <div className="space-y-3">
-            <Textarea rows={10} value={source} onChange={(e) => setSource(e.target.value)} placeholder="Paste your source material here…" aria-label="Source text" />
-            <Button onClick={generate} disabled={busy || source.trim().length < 50} variant="gradient" className="w-full">
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1 text-sm" role="tablist">
+              <button role="tab" aria-selected={mode === 'paste'} onClick={() => setMode('paste')} className={`flex items-center justify-center gap-2 rounded-md py-1.5 font-medium ${mode === 'paste' ? 'bg-card shadow' : 'text-muted-foreground'}`}><Type className="h-4 w-4" />Paste text</button>
+              <button role="tab" aria-selected={mode === 'upload'} onClick={() => setMode('upload')} className={`flex items-center justify-center gap-2 rounded-md py-1.5 font-medium ${mode === 'upload' ? 'bg-card shadow' : 'text-muted-foreground'}`}><UploadCloud className="h-4 w-4" />Upload file</button>
+            </div>
+
+            {mode === 'paste' ? (
+              <Textarea rows={10} value={source} onChange={(e) => setSource(e.target.value)} placeholder="Paste your source material here…" aria-label="Source text" />
+            ) : (
+              <label className="flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-10 cursor-pointer hover:bg-accent/40 transition">
+                <UploadCloud className="h-8 w-8 text-muted-foreground mb-2" />
+                <span className="text-sm font-medium">{file ? file.name : 'Click to choose a file'}</span>
+                <span className="text-xs text-muted-foreground mt-1">.docx, .pptx, .pdf, .txt, .md up to 10 MB</span>
+                <input
+                  type="file"
+                  className="hidden"
+                  accept=".docx,.pptx,.pdf,.txt,.md,.rtf,.odt,.xlsx"
+                  onChange={(e) => setFile(e.target.files?.[0] || null)}
+                />
+              </label>
+            )}
+
+            <Button onClick={generate} disabled={busy || !canGenerate} variant="gradient" className="w-full">
               <Sparkles className="h-4 w-4" />{busy ? 'Reading…' : 'Generate notes'}
             </Button>
-            <p className="text-xs text-muted-foreground text-center">Needs at least a paragraph of source text.</p>
+            <p className="text-xs text-muted-foreground text-center">
+              {mode === 'paste' ? 'Needs at least a paragraph of source text.' : 'Word, PowerPoint, PDF, or plain text — text gets extracted and sent to the AI.'}
+            </p>
           </div>
         ) : (
           <div className="space-y-3">
