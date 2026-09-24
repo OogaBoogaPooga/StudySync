@@ -118,7 +118,7 @@ export default function Room() {
                   <p className="text-xs text-muted-foreground">{poll.total} vote{poll.total === 1 ? '' : 's'} · tap again to change yours</p></div>
               ) : pollForm ? (
                 <form onSubmit={createPoll} className="space-y-2"><Input required placeholder="Question" value={pollForm.question} onChange={(e) => setPollForm({ ...pollForm, question: e.target.value })} aria-label="Poll question" /><textarea required rows={3} placeholder={'One option per line'} value={pollForm.options} onChange={(e) => setPollForm({ ...pollForm, options: e.target.value })} aria-label="Poll options" className="w-full rounded-md border bg-background px-3 py-2 text-sm" /><div className="flex gap-2"><Button type="submit" size="sm" variant="gradient">Start poll</Button><Button type="button" size="sm" variant="ghost" onClick={() => setPollForm(null)}>Cancel</Button></div></form>
-              ) : <p className="text-sm text-muted-foreground">No active poll. Decide what to study next!</p>}
+              ) : <p className="text-sm text-muted-foreground">No active poll. Decide what to study next.</p>}
             </CardContent>
           </Card>
         </div>
