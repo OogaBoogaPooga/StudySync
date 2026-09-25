@@ -12,6 +12,7 @@ import assignmentRoutes from './routes/assignments.js';
 import sessionRoutes from './routes/sessions.js';
 import { setRoutes, shareRoutes } from './routes/sets.js';
 import aiRoutes from './routes/ai.js';
+import quizzesRoutes from './routes/quizzes.js';
 import { setupSockets } from './socket.js';
 
 if (!process.env.JWT_SECRET) {
@@ -35,6 +36,7 @@ app.use('/api/sessions', sessionRoutes);
 app.use('/api/sets', setRoutes);
 app.use('/api/share', shareRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/quizzes', quizzesRoutes);
 
 // In production, serve the built React app from /dist
 if (process.env.NODE_ENV === 'production') {
