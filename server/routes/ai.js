@@ -359,6 +359,47 @@ function tokenize(str) {
     .filter((w) => w.length > 2 && !CHAT_STOPWORDS.has(w));
 }
 
+// Strip HTML tags/entities down to clean plain text
+function stripHtml(html) {
+  return String(html || '')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<br\s*\/?>/gi, NL)
+    .replace(/<\/(p|div|h[1-6]|li|tr|blockquote)>/gi, NL)
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, NL + NL)
+    .trim();
+}
+
+// Split a set's HTML content into paragraph-sized chunks.
+// Prefers <p>, <h1-6>, <li> boundaries so each AI-generated entry stays whole.
+function chunksFromHtml(html, setTitle) {
+  const src = String(html || '');
+  const out = [];
+  const re = /<(p|h[1-6]|li)\b[^>]*>([\s\S]*?)<\/\1>/gi;
+  let m;
+  while ((m = re.exec(src)) !== null) {
+    const text = stripHtml(m[2]).trim();
+    if (text.length >= 25) out.push({ text, setTitle });
+  }
+  // Fallback: no structured tags — split on blank lines
+  if (!out.length) {
+    const plain = stripHtml(src);
+    for (const para of plain.split(/\n{2,}/)) {
+      const t = para.trim();
+      if (t.length >= 25) out.push({ text: t, setTitle });
+    }
+  }
+  return out;
+}
+
 function rankCards(question, cards) {
   const qTokens = tokenize(question);
   if (!qTokens.length) return [];
@@ -382,13 +423,36 @@ function rankCards(question, cards) {
     .map((s) => s.card);
 }
 
+// Same idea as rankCards, but for note paragraphs.
+function rankChunks(question, chunks) {
+  const qTokens = tokenize(question);
+  if (!qTokens.length) return [];
+  const qSet = new Set(qTokens);
+  const qLower = question.toLowerCase();
+
+  const scored = chunks.map((chunk) => {
+    const tokens = tokenize(chunk.text);
+    let score = 0;
+    for (const t of tokens) if (qSet.has(t)) score += 1;
+    // Big bonus if the whole question appears verbatim
+    if (chunk.text.toLowerCase().includes(qLower)) score += 10;
+    return { chunk, score };
+  });
+
+  return scored
+    .filter((s) => s.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 6)
+    .map((s) => s.chunk);
+}
+
 router.post('/chat', validate(z.object({
   message: z.string().trim().min(1),
   setId: z.string().nullable().optional(),
 })), wrap(async (req, res) => {
   const { message, setId } = req.body;
 
-  let cards = [];
+  let sets = [];
   let scopeLabel = 'all of your study sets';
 
   if (setId) {
@@ -397,33 +461,65 @@ router.post('/chat', validate(z.object({
       include: { cards: true },
     });
     if (!set) return res.status(404).json({ error: 'Set not found' });
-    cards = set.cards.map((c) => ({ ...c, setTitle: set.title }));
+    sets = [set];
     scopeLabel = 'the study set "' + set.title + '"';
   } else {
-    const sets = await prisma.studySet.findMany({
+    sets = await prisma.studySet.findMany({
       where: { userId: req.user.id },
       include: { cards: true },
     });
-    cards = sets.flatMap((s) => s.cards.map((c) => ({ ...c, setTitle: s.title })));
   }
 
-  if (!cards.length) {
+  // Both: rich-text notes AND flashcards
+  const allCards = sets.flatMap((s) => s.cards.map((c) => ({ ...c, setTitle: s.title })));
+  const allChunks = sets.flatMap((s) => chunksFromHtml(s.content, s.title));
+
+  if (!allCards.length && !allChunks.length) {
     return res.json({
-      reply: "You don't have any cards yet. Add some to a study set and I'll be able to help.",
+      reply: "You don't have any notes or cards yet. Add some content to a study set and I'll be able to help.",
       sources: [],
     });
   }
 
-  const top = rankCards(message, cards);
-  const used = top.length ? top : cards.slice(0, 12);
-  const passages = used
-    .map((c, i) => '[' + (i + 1) + '] ' + c.front + ' - ' + c.back + ' (from "' + c.setTitle + '")')
-    .join(NL);
+  const topChunks = rankChunks(message, allChunks);
+  const topCards = rankCards(message, allCards);
+
+  const passages = [];
+  const sources = [];
+  let n = 1;
+
+  // Notes first — they're the richer source
+  for (const c of topChunks) {
+    passages.push('[' + n + '] (from notes: "' + c.setTitle + '") ' + c.text);
+    sources.push({ kind: 'note', setTitle: c.setTitle, text: c.text });
+    n++;
+  }
+  for (const c of topCards) {
+    passages.push('[' + n + '] (flashcard: "' + c.setTitle + '") ' + c.front + ' - ' + c.back);
+    sources.push({ kind: 'card', setTitle: c.setTitle, text: c.front + ' - ' + c.back });
+    n++;
+  }
+
+  // Nothing matched — fall back to a sampling of the notes
+  if (!passages.length) {
+    for (const c of allChunks.slice(0, 8)) {
+      passages.push('[' + n + '] (from notes: "' + c.setTitle + '") ' + c.text);
+      sources.push({ kind: 'note', setTitle: c.setTitle, text: c.text });
+      n++;
+    }
+    for (const c of allCards.slice(0, 4)) {
+      passages.push('[' + n + '] (flashcard: "' + c.setTitle + '") ' + c.front + ' - ' + c.back);
+      sources.push({ kind: 'card', setTitle: c.setTitle, text: c.front + ' - ' + c.back });
+      n++;
+    }
+  }
+
+  const passageBlock = passages.length ? passages.join(NL) : '(No matching content.)';
 
   const systemPrompt = 'You are StudySync\'s study assistant. Answer the user\'s question using ONLY the information in the passages below, drawn from ' + scopeLabel + '.' + NL +
     'Rules:' + NL +
-    '- If the user asks a factual question (e.g. "what was X", "when did Y happen") and the passages do not contain the answer, reply exactly: "I couldn\'t find that in your notes."' + NL +
-    '- If the user asks a meta-question about their study material (e.g. "what should I study", "summarize this set", "quiz me"), you may recommend specific terms from the passages.' + NL +
+    '- If the user asks a factual question and the passages do not contain the answer, reply exactly: "I couldn\'t find that in your notes."' + NL +
+    '- If the user asks a meta-question about their study material ("what should I study", "summarize this set"), recommend specific terms from the passages.' + NL +
     '- Be concise: 1-3 short paragraphs max.' + NL +
     '- When you use a passage, cite it inline like [1], [2].' + NL +
     '- Do not invent facts. Do not use outside knowledge.';
@@ -437,7 +533,7 @@ router.post('/chat', validate(z.object({
 
   const reply = await callAI({
     systemPrompt,
-    userPrompt: 'Passages:' + NL + passages + NL + NL + 'Question: ' + message,
+    userPrompt: 'Passages:' + NL + passageBlock + NL + NL + 'Question: ' + message,
     maxTokens: 1200,
   });
 
@@ -448,10 +544,7 @@ router.post('/chat', validate(z.object({
     ],
   });
 
-  res.json({
-    reply,
-    sources: used.map((c) => ({ front: c.front, back: c.back, setTitle: c.setTitle })),
-  });
+  res.json({ reply, sources });
 }));
 
 export default router;
