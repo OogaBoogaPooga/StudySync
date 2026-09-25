@@ -119,6 +119,7 @@ FORMAT RULES — follow these without exception:
 - Citation markers like [1][2] belong at the end of the sentence they support — inline, never as their own entry. Never write an entry explaining what a footnote is.
 - Strip any trailing comma, semicolon, or colon from a term name before bolding it.
 - Never split a proper noun phrase. "Proclamation of 1763" is one entry, not two.
+- Every named person from the source gets their own standalone entry — even if they are also mentioned inside another entry. Benjamin Franklin, George Washington, King George III, and Chief Pontiac each get their own <strong>Name:</strong> paragraph describing who they were and what they did. Do not bury a person only inside an event entry.
 
 SKIP ENTIRELY — do not write entries for:
 - Section or chapter headings (CAUSES, TOPIC, PERIOD, UNIT, WARPERIOD, SECTION, CHAPTER, OVERVIEW)
