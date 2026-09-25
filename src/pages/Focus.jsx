@@ -5,13 +5,14 @@ import { Chart as ChartJS, BarElement, CategoryScale, LinearScale, Tooltip } fro
 import { format } from 'date-fns';
 import { api } from '@/lib/api.js';
 import { useApp } from '@/lib/store.jsx';
+import { useMusic } from '@/lib/music.jsx';
+import MusicSidebar from '@/components/MusicSidebar.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card.jsx';
 import { Textarea } from '@/components/ui/input.jsx';
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip);
 
-// Pomodoro configuration (minutes). Long break after every 4 focus rounds.
 const FOCUS = 25, SHORT = 5, LONG = 15;
 const NOTES_KEY = 'studysync_session_notes';
 
@@ -25,7 +26,8 @@ const DISTRACTION_TIPS = [
 
 export default function Focus() {
   const { toast } = useApp();
-  const [mode, setMode] = useState('focus'); // focus | short | long
+  const music = useMusic();
+  const [mode, setMode] = useState('focus');
   const [round, setRound] = useState(1);
   const [secondsLeft, setSecondsLeft] = useState(FOCUS * 60);
   const [running, setRunning] = useState(false);
@@ -40,20 +42,25 @@ export default function Focus() {
   const loadHistory = () => Promise.all([api('/sessions'), api('/sessions/stats')]).then(([h, s]) => { setHistory(h); setStats(s); }).catch(() => {});
   useEffect(() => { loadHistory(); }, []);
 
-  // Auto-save notes to localStorage (debounced 600ms)
+  // Auto-start music when Focus opens (browser may block until first click)
+  useEffect(() => {
+    if (music.enabled && !music.playing) {
+      music.play();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     const t = setTimeout(() => { localStorage.setItem(NOTES_KEY, notes); setSavedAt(new Date()); }, 600);
     return () => clearTimeout(t);
   }, [notes]);
 
-  // Timer tick
   useEffect(() => {
     if (!running) return;
     tickRef.current = setInterval(() => setSecondsLeft((s) => s - 1), 1000);
     return () => clearInterval(tickRef.current);
   }, [running]);
 
-  // Handle completion
   useEffect(() => {
     if (secondsLeft > 0) return;
     setRunning(false);
@@ -74,7 +81,6 @@ export default function Focus() {
       if ('Notification' in window && Notification.permission === 'granted') new Notification('StudySync', { body: msg });
       try { new AudioContext().resume(); beep(); } catch {}
     }
-    // Advance cycle: focus → short (or long every 4th) → focus
     if (mode === 'focus') {
       const next = round % 4 === 0 ? 'long' : 'short';
       setMode(next); setSecondsLeft((next === 'long' ? LONG : SHORT) * 60);
@@ -104,7 +110,6 @@ export default function Focus() {
               ))}
             </div>
 
-            {/* Circular progress ring */}
             <div className="relative h-56 w-56" role="timer" aria-live="off" aria-label={`${fmt(secondsLeft)} remaining`}>
               <svg viewBox="0 0 200 200" className="h-full w-full -rotate-90">
                 <circle cx="100" cy="100" r="88" className="stroke-muted" strokeWidth="10" fill="none" />
@@ -131,6 +136,8 @@ export default function Focus() {
       </div>
 
       <div className="space-y-6">
+        <MusicSidebar />
+
         <Card>
           <CardHeader><CardTitle className="flex items-center gap-2"><ShieldOff className="h-4 w-4 text-primary" />Distraction blockers</CardTitle></CardHeader>
           <CardContent><ul className="space-y-2 text-sm text-muted-foreground list-disc pl-4">{DISTRACTION_TIPS.map((t) => <li key={t}>{t}</li>)}</ul></CardContent>
@@ -157,7 +164,6 @@ export default function Focus() {
 
 const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
-/** Short two-tone chime using the Web Audio API (no asset files needed) */
 function beep() {
   const ctx = new AudioContext();
   [660, 880].forEach((freq, i) => {
