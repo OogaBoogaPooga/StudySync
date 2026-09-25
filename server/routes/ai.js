@@ -111,27 +111,27 @@ function extractPdfHtml(buffer) {
   });
 }
 
-const NOTES_SYSTEM_PROMPT = `You turn source material into detailed APUSH study notes written in the voice of a sharp, well-prepared student — clear and precise, but not stiff or robotic. Not a textbook. Not a text message. The kind of notes you'd actually use to write an LEQ or DBQ.
+const NOTES_SYSTEM_PROMPT = `You turn source material into detailed APUSH study notes written in the voice of a sharp, well-prepared student — clear and precise, but not stiff or robotic. Not a textbook. Not a text message. The kind of notes you would actually use to write an LEQ or DBQ.
 
 FORMAT — every entry looks exactly like this, one per paragraph:
-<p><strong>Term:</strong> explanation covering what it is, when/where it happened, who was involved, and why it mattered historically. 2–4 sentences.</p>
+<p><strong>Term:</strong> explanation covering what it is, when/where it happened, who was involved, and why it mattered historically. 2 to 4 sentences.</p>
 
 RULES:
 1. Pull out every named event, war, treaty, battle, person, place, act, policy, movement, court case, and year from the source. Each one gets its own entry.
-2. Do not skip anyone or anything. If a person is named (George Washington, Benjamin Franklin, King George III, Chief Pontiac), they get their own entry.
-3. Never split a term across punctuation. "Proclamation of 1763" is ONE term, written as <strong>Proclamation of 1763:</strong>. Never write "Proclamation of:" then "1763:" separately. Never put a period or comma right before the colon.
-4. Never invent facts or years. Only use what's in the source.
-5. Preserve every date, name, number, and citation marker like [1] or [2] exactly as written.
-6. If the source has <strong>, <em>, <u>, or <mark> tags, every term inside those tags MUST get its own entry.
-7. Tone: write like a student who genuinely understands the material. Full sentences. Proper historical terms. You can say "this led to" or "the key thing here is" — but avoid filler phrases like "basically" or "in other words." No fluff, no hedging.
-8. For every entry, include: what it is + when/context + why it mattered (cause, effect, or historical significance for APUSH themes like continuity & change, causation, or power & politics).
+2. Do not skip anyone or anything. If a person is named, they get their own entry.
+3. Never split a term across punctuation. "Proclamation of 1763" is ONE term written as Proclamation of 1763 inside the strong tag. Never put a period or comma right before the colon.
+4. Never invent facts or years. Only use what is in the source.
+5. Preserve every date, name, number, and citation marker exactly as written.
+6. If the source has strong, em, u, or mark tags, every term inside those tags MUST get its own entry.
+7. Tone: write like a student who genuinely understands the material. Full sentences. Proper historical terms. You can say "this led to" or "the key thing here is" but avoid filler phrases. No fluff, no hedging.
+8. For every entry include: what it is, when or context, and why it mattered for APUSH themes like continuity and change, causation, or power and politics.
 9. No Key Terms section. No Key Takeaways. No Cause and Effect section. No headers of any kind. Everything is inline paragraphs only.
 
-OUTPUT FORMAT — critical: Respond with HTML content ONLY. No JSON. No markdown. No backticks. No preamble like "Here are your notes:". Start immediately with content.
-On the very first line, output the title as a plain text line ending with a newline, then start the HTML on the next line. Example:
+OUTPUT FORMAT: Respond with HTML content ONLY. No JSON. No markdown. No backticks. No preamble.
+On the very first line output the title as plain text ending with a newline, then start the HTML. Example:
 
 Proclamation of 1763
-<p><strong>Proclamation of 1763:</strong> Issued by Britain in 1763 after the Seven Years' War, this law prohibited colonial settlement west of the Appalachian Mountains. It was meant to prevent costly conflicts with Native Americans, but colonists saw it as an infringement on their rights and largely ignored it — fueling early resentment toward British authority.</p>
+<p><strong>Proclamation of 1763:</strong> Issued by Britain in 1763 after the Seven Years War, this law prohibited colonial settlement west of the Appalachian Mountains. It was meant to prevent costly conflicts with Native Americans, but colonists saw it as an infringement on their rights and largely ignored it, fueling early resentment toward British authority.</p>
 <p><strong>George Washington:</strong> Virginia planter and militia officer who commanded colonial forces during the French and Indian War, including the defeat at Fort Necessity in 1754. His military experience and reputation later made him the obvious choice to lead the Continental Army.</p>
 
 Only use these tags: p, strong, em, u, mark.`;
@@ -149,7 +149,6 @@ const STOPWORDS = new Set([
 function extractTerms(text) {
   const terms = new Set();
 
-  // Priority: pull anything already bolded, italicized, underlined, or highlighted
   for (const tag of ['strong', 'em', 'u', 'mark']) {
     const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'gi');
     let m;
@@ -159,7 +158,6 @@ function extractTerms(text) {
     }
   }
 
-  // Capitalized multi-word phrases (names, acts, events, places)
   const plain = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
   const phrases = plain.match(/\b[A-Z][a-zA-Z]+(?:\s+(?:[A-Z][a-zA-Z]+|[&']\s*[A-Z][a-zA-Z]+)){0,3}\b/g) || [];
   for (const p of phrases) {
@@ -169,7 +167,6 @@ function extractTerms(text) {
     terms.add(clean);
   }
 
-  // Years (1500s–1900s)
   for (const y of plain.match(/\b1[5-9]\d{2}\b/g) || []) terms.add(y);
 
   return [...terms].slice(0, 30);
@@ -178,7 +175,7 @@ function extractTerms(text) {
 async function generateNotes(sourceContent) {
   const terms = extractTerms(sourceContent);
   const checklist = terms.length
-    ? `\n\nMANDATORY TERMS — your output MUST contain a separate <strong>Term:</strong> entry for EVERY item below. Do not merge them. Do not skip any.\n\n${terms.map((t) => `- ${t}`).join('\n')}`
+    ? `\n\nMANDATORY TERMS — your output MUST contain a separate entry for EVERY item below. Do not merge them. Do not skip any.\n\n${terms.map((t) => `- ${t}`).join('\n')}`
     : '';
 
   if (process.env.GROQ_API_KEY) {
@@ -216,4 +213,118 @@ async function generateNotes(sourceContent) {
         return { title, html, source: 'ai' };
       }
     } catch (e) {
-      console.warn('Gro*
+      console.warn('Groq notes generation failed, falling back:', e.message);
+    }
+  }
+
+  const plain = sourceContent.replace(/<[^>]+>/g, ' ');
+  return { ...heuristicNotes(plain), source: 'heuristic' };
+}
+
+function heuristicNotes(text) {
+  const plain = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  const sentences = plain.split(/(?<=[.!?])\s+/).slice(0, 60);
+  const paragraphs = [];
+  for (let i = 0; i < sentences.length; i += 4) {
+    const chunk = sentences.slice(i, i + 4).join(' ');
+    if (chunk) paragraphs.push(`<p>${chunk}</p>`);
+  }
+  const title = (plain.split(/[.!?]/)[0] || 'Notes').slice(0, 60).trim();
+  return { title, html: `<h2>Summary</h2>${paragraphs.join('')}` };
+}
+
+function heuristicCards(text, max = 12) {
+  const cards = [];
+  const plain = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  for (const line of text.replace(/<[^>]+>/g, '\n').split(/\n+/)) {
+    const m = line.match(/^\s*([^:\-\u2013]{2,60})\s*[:\-\u2013]\s*(.{5,})$/);
+    if (m) cards.push({ front: `What is ${m[1].trim()}?`, back: m[2].trim() });
+  }
+  for (const sentence of plain.split(/(?<=[.!?])\s+/)) {
+    if (cards.length >= max) break;
+    const m = sentence.match(/^(?:The\s+)?([A-Z][\w\s-]{2,50}?)\s+(is|are|means|refers to)\s+(.{8,})$/i);
+    if (m) cards.push({ front: `What ${m[2].toLowerCase()} ${m[1].trim()}?`, back: sentence.trim() });
+  }
+  const seen = new Set();
+  return cards.filter((c) => !seen.has(c.front) && seen.add(c.front)).slice(0, max);
+}
+
+/* ---------- Flashcards ---------- */
+
+router.post(
+  '/flashcards',
+  validate(z.object({
+    text: z.string().trim().min(20, 'Paste at least a few sentences'),
+    max: z.coerce.number().int().min(1).max(30).default(12),
+  })),
+  wrap(async (req, res) => {
+    const { text, max } = req.body;
+    let cards = [];
+    let source = 'heuristic';
+
+    if (process.env.GROQ_API_KEY) {
+      try {
+        const content = await callAI({
+          systemPrompt: `You are a study assistant. Summarize the student's notes into up to ${max} high-quality flashcards. Respond ONLY with JSON: {"cards":[{"front":"question","back":"concise answer"}]}. Questions should test understanding, not trivia. Keep answers under 40 words.`,
+          userPrompt: text.slice(0, 12000),
+          jsonMode: true,
+          maxTokens: 3000,
+        });
+        const parsed = JSON.parse(content);
+        cards = (parsed.cards || []).filter((c) => c.front && c.back).slice(0, max);
+        source = 'ai';
+      } catch (e) {
+        console.warn('Groq flashcard generation failed, falling back:', e.message);
+      }
+    }
+
+    if (!cards.length) cards = heuristicCards(text, max);
+    if (!cards.length) return res.status(422).json({ error: 'Could not extract flashcards. Try "Term: definition" lines or fuller sentences.' });
+    res*
+        res.json({ cards, source });
+  })
+);
+
+/* ---------- Notes (pasted text) ---------- */
+
+router.post(
+  '/notes',
+  validate(z.object({
+    text: z.string().trim().min(50, 'Paste at least a paragraph of source text'),
+  })),
+  wrap(async (req, res) => {
+    const normalized = normalizeHtml(req.body.text);
+    res.json(await generateNotes(normalized));
+  })
+);
+
+/* ---------- Notes (uploaded file) ---------- */
+
+router.post('/notes/upload', upload.single('file'), wrap(async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+  const name = (req.file.originalname || '').toLowerCase();
+  let content = '';
+
+  try {
+    if (name.endsWith('.docx')) {
+      const result = await mammoth.convertToHtml({ buffer: req.file.buffer });
+      content = normalizeHtml(result.value);
+    } else if (name.endsWith('.pdf')) {
+      content = await extractPdfHtml(req.file.buffer);
+    } else {
+      content = await parseOfficeAsync(req.file.buffer);
+    }
+  } catch (e) {
+    return res.status(422).json({ error: `Could not read that file (${e.message}). Try .docx, .pptx, .pdf, or .txt.` });
+  }
+
+  content = (content || '').trim();
+  if (content.replace(/<[^>]+>/g, '').trim().length < 50) {
+    return res.status(422).json({ error: 'That file has too little text to work with.' });
+  }
+
+  res.json(await generateNotes(content));
+}));
+
+export default router;
