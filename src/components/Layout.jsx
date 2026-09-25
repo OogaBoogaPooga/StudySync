@@ -1,8 +1,9 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, CalendarDays, Timer, BookOpen, GraduationCap, Users, Moon, Sun, Contrast, LogOut, Sparkles, Music2, VolumeX } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Timer, BookOpen, GraduationCap, Users, Moon, Sun, Contrast, LogOut, Music2, VolumeX } from 'lucide-react';
 import { useApp } from '@/lib/store.jsx';
 import { useMusic } from '@/lib/music.jsx';
 import NotesChat from './NotesChat.jsx';
+import Logo from './Logo.jsx';
 import { Button } from './ui/button.jsx';
 import { cn } from '@/lib/utils';
 
@@ -41,9 +42,8 @@ export default function Layout() {
       <a href="#main" className="skip-link">Skip to content</a>
 
       <aside className="hidden md:flex md:w-60 md:flex-col border-r bg-card/60 backdrop-blur sticky top-0 h-screen no-print">
-        <div className="flex items-center gap-2 px-5 py-5">
-          <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-slate-700 to-slate-500 text-white shadow-md"><Sparkles className="h-5 w-5" /></div>
-          <span className="text-lg font-bold gradient-text">StudySync</span>
+        <div className="px-5 py-5">
+          <Logo />
         </div>
         <nav aria-label="Main" className="flex-1 space-y-1 px-3">
           {NAV.map(({ to, label, icon: Icon }) => (
@@ -62,7 +62,7 @@ export default function Layout() {
       </aside>
 
       <header className="md:hidden sticky top-0 z-40 flex items-center justify-between border-b glass px-4 py-3 no-print">
-        <span className="font-bold gradient-text">StudySync</span>
+        <Logo size="sm" />
         <div className="flex gap-1">
           <MusicToggleButton />
           <Button variant="ghost" size="icon" onClick={toggleDark} aria-label="Toggle dark mode">{isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</Button>
