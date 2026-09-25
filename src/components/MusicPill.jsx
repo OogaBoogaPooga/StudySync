@@ -7,28 +7,71 @@ import { useMusic } from '@/lib/music.jsx';
 import { TRACKS, MOODS } from '@/lib/musicCatalog.js';
 import { cn } from '@/lib/utils';
 
-const EQ_STYLE = `
+const STYLES = `
 @keyframes sync-eq {
   0%, 100% { transform: scaleY(0.4); }
   50%      { transform: scaleY(1); }
 }
+.music-glass {
+  background: hsl(var(--card) / 0.82);
+  border: 1px solid hsl(var(--border) / 0.9);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  box-shadow:
+    0 12px 40px -12px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+.dark .music-glass {
+  background: hsl(var(--card) / 0.72);
+  border-color: hsl(var(--border) / 0.8);
+  box-shadow:
+    0 16px 48px -14px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+.music-btn-primary {
+  background: hsl(110 22% 42%);
+  color: #fff;
+  box-shadow:
+    0 4px 14px -3px rgba(85, 107, 47, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: background 160ms ease, transform 120ms ease;
+}
+.music-btn-primary:hover { background: hsl(110 22% 37%); }
+.music-btn-primary:active { transform: scale(0.95); }
+.dark .music-btn-primary {
+  background: hsl(110 24% 50%);
+  box-shadow:
+    0 4px 14px -3px rgba(85, 107, 47, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+.dark .music-btn-primary:hover { background: hsl(110 24% 55%); }
+.music-active {
+  background: hsl(110 22% 42% / 0.14);
+  color: hsl(110 25% 32%);
+}
+.dark .music-active {
+  background: hsl(110 25% 50% / 0.18);
+  color: hsl(110 30% 78%);
+}
+.music-chip-active {
+  background: hsl(110 22% 42% / 0.14);
+  border-color: hsl(110 22% 42% / 0.45);
+  color: hsl(110 25% 32%);
+}
+.dark .music-chip-active {
+  background: hsl(110 25% 50% / 0.18);
+  border-color: hsl(110 25% 50% / 0.45);
+  color: hsl(110 30% 78%);
+}
+.music-icon-active {
+  background: hsl(110 22% 42% / 0.14);
+  color: hsl(110 25% 32%);
+}
+.dark .music-icon-active {
+  background: hsl(110 25% 50% / 0.18);
+  color: hsl(110 30% 78%);
+}
 `;
-
-// Glass tokens — warm amber-tinted, heavy blur
-const GLASS_PANEL =
-  'border border-white/25 dark:border-amber-200/15 ' +
-  'bg-gradient-to-br from-white/30 via-white/15 to-amber-100/20 ' +
-  'dark:from-slate-900/40 dark:via-slate-900/25 dark:to-amber-950/20 ' +
-  'backdrop-blur-3xl backdrop-saturate-200 ' +
-  'shadow-[0_20px_60px_-15px_rgba(217,119,6,0.25),0_8px_24px_-8px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.5)] ' +
-  'dark:shadow-[0_20px_60px_-15px_rgba(217,119,6,0.15),0_8px_24px_-8px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.12)]';
-
-const GLASS_PILL = GLASS_PANEL + ' rounded-full';
-
-const AMBER_BTN =
-  'bg-gradient-to-br from-amber-400 to-yellow-500 text-slate-900 ' +
-  'shadow-[0_4px_14px_-2px_rgba(245,158,11,0.5),inset_0_1px_0_rgba(255,255,255,0.4)] ' +
-  'hover:from-amber-300 hover:to-yellow-400';
 
 export default function MusicPill() {
   const m = useMusic();
@@ -63,35 +106,33 @@ export default function MusicPill() {
 
   return (
     <>
-      <style>{EQ_STYLE}</style>
+      <style>{STYLES}</style>
       <div
         ref={wrapperRef}
         className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-40 w-[min(440px,calc(100vw-2rem))]"
       >
-        {/* Expanded panel */}
         <div
           className={cn(
-            'mb-2 overflow-hidden rounded-3xl transition-all duration-300 ease-out',
-            GLASS_PANEL,
+            'music-glass mb-2 overflow-hidden rounded-3xl transition-all duration-300 ease-out',
             expanded ? 'max-h-[70vh] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'
           )}
         >
           <div className="p-3 space-y-3">
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-foreground/50" />
+                <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search tracks…"
-                  className="w-full rounded-full border border-white/30 bg-white/30 pl-8 pr-3 py-1.5 text-xs outline-none placeholder:text-foreground/40 focus:border-amber-400/50 focus:ring-2 focus:ring-amber-400/20 dark:border-white/10 dark:bg-black/20 backdrop-blur-sm"
+                  className="w-full rounded-full border border-border/70 bg-background/60 pl-8 pr-3 py-1.5 text-xs outline-none placeholder:text-muted-foreground focus:border-primary/50 focus:ring-2 focus:ring-primary/15"
                   aria-label="Search tracks"
                 />
               </div>
               <button
                 onClick={() => m.setMasterEnabled(false)}
                 title="Turn music off in the app"
-                className="grid h-7 w-7 place-items-center rounded-full text-foreground/60 hover:bg-white/40 dark:hover:bg-white/10"
+                className="grid h-7 w-7 place-items-center rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                 aria-label="Turn music off"
               >
                 <X className="h-3.5 w-3.5" />
@@ -104,10 +145,10 @@ export default function MusicPill() {
                   key={mo}
                   onClick={() => setMood(mo)}
                   className={cn(
-                    'rounded-full border px-2.5 py-1 text-[10px] font-medium transition-all',
+                    'rounded-full border px-2.5 py-1 text-[10px] font-medium transition-colors',
                     mood === mo
-                      ? 'border-amber-400/50 bg-gradient-to-br from-amber-400/25 to-yellow-500/20 text-amber-700 dark:text-amber-200'
-                      : 'border-white/30 bg-white/20 text-foreground/70 hover:bg-white/40 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10'
+                      ? 'music-chip-active'
+                      : 'border-border/70 bg-background/40 text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                   )}
                 >
                   {mo}
@@ -117,7 +158,7 @@ export default function MusicPill() {
 
             <div className="max-h-[42vh] overflow-y-auto -mx-1 px-1 space-y-0.5">
               {visible.length === 0 && (
-                <p className="py-6 text-center text-xs text-foreground/50">No tracks match.</p>
+                <p className="py-6 text-center text-xs text-muted-foreground">No tracks match.</p>
               )}
               {visible.map((t) => {
                 const isCurrent = t.id === m.currentId;
@@ -127,17 +168,15 @@ export default function MusicPill() {
                     onClick={() => m.selectTrack(t.id)}
                     className={cn(
                       'group flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors',
-                      isCurrent
-                        ? 'bg-gradient-to-r from-amber-400/25 to-yellow-500/15 text-amber-700 dark:text-amber-200'
-                        : 'hover:bg-white/40 dark:hover:bg-white/5'
+                      isCurrent ? 'music-active' : 'hover:bg-accent hover:text-accent-foreground'
                     )}
                   >
                     <span
                       className={cn(
                         'grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[10px] font-semibold',
                         isCurrent
-                          ? 'bg-gradient-to-br from-amber-400 to-yellow-500 text-slate-900'
-                          : 'bg-white/40 dark:bg-white/5 text-foreground/60'
+                          ? 'music-btn-primary'
+                          : 'bg-muted/60 text-muted-foreground'
                       )}
                     >
                       {isCurrent && m.playing ? (
@@ -152,18 +191,18 @@ export default function MusicPill() {
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-xs font-medium">{t.title}</span>
-                      <span className="block truncate text-[10px] text-foreground/50">{t.mood}</span>
+                      <span className="block truncate text-[10px] opacity-60">{t.mood}</span>
                     </span>
                   </button>
                 );
               })}
             </div>
 
-            <div className="flex items-center justify-between border-t border-white/20 dark:border-white/10 pt-2 text-[10px] text-foreground/60">
+            <div className="flex items-center justify-between border-t border-border/60 pt-2 text-[10px] text-muted-foreground">
               <span>{TRACKS.length} tracks · CC0 public domain</span>
               <button
                 onClick={() => m.setMasterEnabled(false)}
-                className="rounded-full px-2 py-0.5 hover:bg-white/40 dark:hover:bg-white/10"
+                className="rounded-full px-2 py-0.5 hover:bg-accent hover:text-accent-foreground"
               >
                 Turn off
               </button>
@@ -171,11 +210,10 @@ export default function MusicPill() {
           </div>
         </div>
 
-        {/* The pill */}
-        <div className={cn('flex items-center gap-2 px-3 py-2', GLASS_PILL)}>
+        <div className="music-glass flex items-center gap-2 rounded-full px-3 py-2">
           <button
             onClick={() => setExpanded((e) => !e)}
-            className="grid h-7 w-7 place-items-center rounded-full text-foreground/60 hover:bg-white/40 dark:hover:bg-white/10"
+            className="grid h-7 w-7 place-items-center rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground"
             aria-label={expanded ? 'Collapse' : 'Expand'}
           >
             <ChevronUp className={cn('h-4 w-4 transition-transform duration-300', expanded && 'rotate-180')} />
@@ -183,7 +221,7 @@ export default function MusicPill() {
 
           <div className="min-w-0 flex-1">
             <div className="truncate text-xs font-semibold leading-tight">{m.currentTrack.title}</div>
-            <div className="truncate text-[10px] leading-tight text-foreground/55">
+            <div className="truncate text-[10px] leading-tight text-muted-foreground">
               {m.error ? m.error : m.loading ? 'Buffering…' : m.currentTrack.mood}
             </div>
           </div>
@@ -192,7 +230,7 @@ export default function MusicPill() {
             onClick={m.toggleShuffle}
             className={cn(
               'grid h-7 w-7 place-items-center rounded-full transition-colors',
-              m.shuffle ? 'text-amber-600 dark:text-amber-300 bg-amber-400/15' : 'text-foreground/50 hover:bg-white/40 dark:hover:bg-white/10'
+              m.shuffle ? 'music-icon-active' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
             )}
             aria-label="Shuffle"
             title={m.shuffle ? 'Shuffle on' : 'Shuffle off'}
@@ -202,7 +240,7 @@ export default function MusicPill() {
 
           <button
             onClick={m.prev}
-            className="grid h-7 w-7 place-items-center rounded-full text-foreground/70 hover:bg-white/40 dark:hover:bg-white/10"
+            className="grid h-7 w-7 place-items-center rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground"
             aria-label="Previous"
           >
             <SkipBack className="h-3.5 w-3.5" />
@@ -210,10 +248,7 @@ export default function MusicPill() {
 
           <button
             onClick={m.toggle}
-            className={cn(
-              'grid h-9 w-9 place-items-center rounded-full transition-transform hover:scale-[1.04] active:scale-95',
-              AMBER_BTN
-            )}
+            className="music-btn-primary grid h-9 w-9 place-items-center rounded-full"
             aria-label={m.playing ? 'Pause' : 'Play'}
           >
             {m.playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 ml-0.5" />}
@@ -221,7 +256,7 @@ export default function MusicPill() {
 
           <button
             onClick={m.next}
-            className="grid h-7 w-7 place-items-center rounded-full text-foreground/70 hover:bg-white/40 dark:hover:bg-white/10"
+            className="grid h-7 w-7 place-items-center rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground"
             aria-label="Next"
           >
             <SkipForward className="h-3.5 w-3.5" />
@@ -231,7 +266,7 @@ export default function MusicPill() {
             onClick={m.cycleLoop}
             className={cn(
               'grid h-7 w-7 place-items-center rounded-full transition-colors',
-              m.loopMode !== 'none' ? 'text-amber-600 dark:text-amber-300 bg-amber-400/15' : 'text-foreground/50 hover:bg-white/40 dark:hover:bg-white/10'
+              m.loopMode !== 'none' ? 'music-icon-active' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
             )}
             aria-label={`Loop: ${m.loopMode}`}
             title={`Loop: ${m.loopMode}`}
@@ -242,14 +277,14 @@ export default function MusicPill() {
           <div className="relative flex items-center">
             <button
               onClick={() => setShowVolume((v) => !v)}
-              className="grid h-7 w-7 place-items-center rounded-full text-foreground/60 hover:bg-white/40 dark:hover:bg-white/10"
+              className="grid h-7 w-7 place-items-center rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground"
               aria-label={m.muted ? 'Unmute' : 'Mute'}
               title={`Volume ${Math.round((m.muted ? 0 : m.volume) * 100)}%`}
             >
               {m.muted || m.volume === 0 ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
             </button>
             {showVolume && (
-              <div className={cn('absolute bottom-full right-0 mb-2 rounded-2xl p-2', GLASS_PANEL)}>
+              <div className="music-glass absolute bottom-full right-0 mb-2 rounded-2xl p-2">
                 <input
                   type="range"
                   min="0"
@@ -257,7 +292,7 @@ export default function MusicPill() {
                   step="0.01"
                   value={m.muted ? 0 : m.volume}
                   onChange={(e) => { m.setMuted(false); m.setVolume(Number(e.target.value)); }}
-                  className="h-1 w-28 accent-amber-500"
+                  className="h-1 w-28 accent-primary"
                   aria-label="Volume"
                 />
               </div>
