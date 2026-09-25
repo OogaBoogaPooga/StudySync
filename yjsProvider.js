@@ -17,7 +17,15 @@ export function createCollabProvider(setId, user) {
   const socket = getSocket();
   let destroyed = false;
   let gotState = false;
-  let seeded = false;
+  // Start as "not allowed to seed". Only flip to false when server grants seed permission.
+  let seedAllowed = false;
+  const readyCallbacks = [];
+
+  const fireReady = () => {
+    for (const cb of readyCallbacks) {
+      try { cb(); } catch (e) { console.warn('[yjs] ready cb failed', e); }
+    }
+  };
 
   awareness.setLocalStateField('user', {
     name: user?.name || 'Someone',
@@ -26,19 +34,32 @@ export function createCollabProvider(setId, user) {
 
   const onState = ({ setId: s, state, shouldSeed }) => {
     if (s !== setId || destroyed) return;
-    try { Y.applyUpdate(doc, new Uint8Array(state), 'remote'); } catch (e) { console.warn('[yjs] state apply failed', e); }
+    try {
+      Y.applyUpdate(doc, new Uint8Array(state), 'remote');
+    } catch (e) {
+      console.warn('[yjs] state apply failed', e);
+    }
     gotState = true;
-    if (shouldSeed) seeded = false;
+    seedAllowed = !!shouldSeed;
+    fireReady();
   };
 
   const onUpdate = ({ setId: s, update }) => {
     if (s !== setId || destroyed) return;
-    try { Y.applyUpdate(doc, new Uint8Array(update), 'remote'); } catch (e) { console.warn('[yjs] update apply failed', e); }
+    try {
+      Y.applyUpdate(doc, new Uint8Array(update), 'remote');
+    } catch (e) {
+      console.warn('[yjs] update apply failed', e);
+    }
   };
 
   const onAwareness = ({ setId: s, update }) => {
     if (s !== setId || destroyed) return;
-    try { applyAwarenessUpdate(awareness, new Uint8Array(update), 'remote'); } catch (e) { console.warn('[yjs] awareness apply failed', e); }
+    try {
+      applyAwarenessUpdate(awareness, new Uint8Array(update), 'remote');
+    } catch (e) {
+      console.warn('[yjs] awareness apply failed', e);
+    }
   };
 
   const onDocUpdate = (update, origin) => {
@@ -71,10 +92,19 @@ export function createCollabProvider(setId, user) {
   return {
     doc,
     awareness,
-    // TipTap's CollaborationCursor expects a provider-like object with .awareness
     provider: { awareness, doc },
-    shouldSeed: () => gotState && !seeded,
-    markSeeded: () => { seeded = true; socket.emit('notes:yjs-seed-applied', { setId }); },
+    onReady: (cb) => {
+      if (gotState) {
+        try { cb(); } catch (e) { console.warn('[yjs] ready cb failed', e); }
+      } else {
+        readyCallbacks.push(cb);
+      }
+    },
+    isSeeder: () => gotState && seedAllowed,
+    markSeeded: () => {
+      seedAllowed = false;
+      socket.emit('notes:yjs-seed-applied', { setId });
+    },
     destroy: () => {
       destroyed = true;
       socket.off('notes:yjs-state', onState);
