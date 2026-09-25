@@ -12,7 +12,7 @@ import assignmentRoutes from './routes/assignments.js';
 import sessionRoutes from './routes/sessions.js';
 import { setRoutes, shareRoutes } from './routes/sets.js';
 import aiRoutes from './routes/ai.js';
-import quizzesRoutes from './routes/quizzes.js'; 
+import quizzesRoutes from './routes/quizzes.js';
 import shareEditRoutes from './routes/shareEdit.js';
 import { setupSockets } from './socket.js';
 
@@ -35,10 +35,13 @@ app.use('/api/classes', classRoutes);
 app.use('/api/assignments', assignmentRoutes);
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/sets', setRoutes);
-app.use('/api/share', shareRoutes); 
+app.use('/api/share', shareRoutes);
 app.use('/api/share', shareEditRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/quizzes', quizzesRoutes);
+
+// Public-domain study music from the /data volume
+app.use('/api/music', express.static('/data/music', { maxAge: '7d', immutable: true }));
 
 // In production, serve the built React app from /dist
 if (process.env.NODE_ENV === 'production') {
