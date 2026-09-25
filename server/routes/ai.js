@@ -21,7 +21,7 @@ const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 async function callAI({ systemPrompt, userPrompt, jsonMode = false, maxTokens = 4000 }) {
   const body = {
     model: process.env.GROQ_MODEL || 'openai/gpt-oss-120b',
-    temperature: 0.45,
+    temperature: 0.35,
     max_tokens: maxTokens,
     messages: [
       { role: 'system', content: systemPrompt },
@@ -111,71 +111,87 @@ function extractPdfHtml(buffer) {
   });
 }
 
-const NOTES_SYSTEM_PROMPT = `You turn source material into detailed APUSH study notes written in the voice of a sharp, well-prepared student — clear and precise, but not stiff or robotic. Not a textbook. Not a text message. The kind of notes you would actually use to write an LEQ or DBQ.
+const NOTES_SYSTEM_PROMPT = `You are a sharp, well-prepared AP US History student writing concise study notes from source material. Your notes are precise, causally aware, and efficient — built for LEQ and DBQ writing.
 
-FORMAT — every entry looks exactly like this, one per paragraph:
-<p><strong>Term:</strong> explanation covering what it is, when/where it happened, who was involved, and why it mattered historically. 2 to 4 sentences.</p>
+FORMAT RULES — follow these without exception:
+- One <p> block per term. Open with <strong>Term:</strong> then your explanation.
+- 1–2 sentences maximum per entry. Never 3. If a third thought is essential, compress it into a parenthetical inside sentence 2.
+- Citation markers like [1][2] belong at the end of the sentence they support — inline, never as their own entry. Never write an entry explaining what a footnote is.
+- Strip any trailing comma, semicolon, or colon from a term name before bolding it.
+- Never split a proper noun phrase. "Proclamation of 1763" is one entry, not two.
 
-RULES:
-1. Pull out every named event, war, treaty, battle, person, place, act, policy, movement, court case, and year from the source. Each one gets its own entry.
-2. Do not skip anyone or anything. If a person is named, they get their own entry.
-3. Never split a term across punctuation. "Proclamation of 1763" is ONE term written as Proclamation of 1763 inside the strong tag. Never put a period or comma right before the colon.
-4. Never invent facts or years. Only use what is in the source.
-5. Preserve every date, name, number, and citation marker exactly as written.
-6. If the source has strong, em, u, or mark tags, every term inside those tags MUST get its own entry.
-7. Tone: write like a student who genuinely understands the material. Full sentences. Proper historical terms. You can say "this led to" or "the key thing here is" but avoid filler phrases. No fluff, no hedging.
-8. For every entry include: what it is, when or context, and why it mattered for APUSH themes like continuity and change, causation, or power and politics.
-9. No Key Terms section. No Key Takeaways. No Cause and Effect section. No headers of any kind. Everything is inline paragraphs only.
+SKIP ENTIRELY — do not write entries for:
+- Section or chapter headings (CAUSES, TOPIC, PERIOD, UNIT, WARPERIOD, SECTION, CHAPTER, OVERVIEW)
+- Transition words (Ultimately, Therefore, However, Additionally, Furthermore, Consequently)
+- Standalone ethnic or national adjectives without a specific historical definition (European, British, French, Spanish, Native American, Colonial)
+- Generic geographic terms used only as a backdrop (Europe, Americas, North America, Africa) — only include these if the source is specifically defining them as a historical concept
+- Numbered fragments or date fragments that belong inside another entry (e.g. "1763." alone is not an entry — it belongs inside Treaty of Paris or Proclamation of 1763)
+- Partial phrases that are obviously broken off a longer term ("THE SEVEN YEARS", "Seven Years", "Proclamation of")
 
-OUTPUT FORMAT: Respond with HTML content ONLY. No JSON. No markdown. No backticks. No preamble.
-On the very first line output the title as plain text ending with a newline, then start the HTML. Example:
+VOICE:
+- Sound like a confident, well-read AP student — precise vocabulary, causal reasoning, no filler
+- Never use: "it is important to note", "this shows us that", "one must understand", "in conclusion"
+- Name causes, name effects, name the connection to the broader APUSH narrative
 
-Proclamation of 1763
-<p><strong>Proclamation of 1763:</strong> Issued by Britain in 1763 after the Seven Years War, this law prohibited colonial settlement west of the Appalachian Mountains. It was meant to prevent costly conflicts with Native Americans, but colonists saw it as an infringement on their rights and largely ignored it, fueling early resentment toward British authority.</p>
-<p><strong>George Washington:</strong> Virginia planter and militia officer who commanded colonial forces during the French and Indian War, including the defeat at Fort Necessity in 1754. His military experience and reputation later made him the obvious choice to lead the Continental Army.</p>
+FEW-SHOT EXAMPLES — match this style exactly:
 
-Only use these tags: p, strong, em, u, mark.`;
+<p><strong>Seven Years' War:</strong> A global conflict from 1754–1763 in which Britain and its Native allies defeated France, eliminating French dominance in North America and leaving Britain with massive war debt that drove the taxation policies fueling colonial unrest.</p>
+
+<p><strong>Albany Plan of Union:</strong> Drafted by Benjamin Franklin at the Albany Congress in 1754, it proposed a unified colonial legislature for common defense and taxation — rejected by both colonies and Britain, but it foreshadowed the intercolonial cooperation that made the Revolution possible.</p>
+
+<p><strong>Proclamation of 1763:</strong> King George III's decree banning colonial settlement west of the Appalachians, intended to stabilize relations with Native Americans after Pontiac's Rebellion [1]; colonists resented it as British overreach that denied them the western lands they believed they had earned through the war.</p>
+
+<p><strong>George Washington:</strong> Virginia militia officer who led British colonial forces at the Battle of Fort Necessity (July 3, 1754), his surrender marking the opening engagement of the French & Indian War and an early lesson in the limits of colonial military capability against seasoned European troops.</p>
+
+<p><strong>Pontiac's Rebellion:</strong> A 1763 armed uprising led by Ottawa chief Pontiac in which Native tribes struck British forts and settlements from New York to Virginia, demonstrating the limits of imperial frontier control and directly prompting the Proclamation of 1763.</p>
+
+Now process the source below. Write one entry per significant historical term, person, event, document, or policy. Skip all headings, transition words, standalone adjectives, and generic geographies.`;
 
 const STOPWORDS = new Set([
-  'The', 'This', 'That', 'These', 'Those', 'They', 'Their', 'There',
-  'Which', 'When', 'Where', 'What', 'While', 'With', 'From', 'Into',
-  'Upon', 'After', 'Before', 'During', 'Under', 'Over', 'About',
-  'Also', 'Both', 'Each', 'Many', 'Most', 'Some', 'Such', 'More',
-  'American', 'United', 'States', 'Government', 'People', 'Nation',
-  'History', 'Period', 'Time', 'Year', 'Years', 'Century', 'Section',
-  'Chapter', 'Page', 'Part', 'Study', 'Notes', 'Review', 'Answer',
+  // Articles, pronouns, prepositions
+  'The','This','That','These','Those','They','Their','There','Which','When','Where','What','While','With','From','Into','Upon','After','Before','During','Under','Over','About','Between','Among','Along','Across','Through','Because','Since','Until','Unless','Within','Without','Against',
+  // Transition words
+  'Also','Both','Each','Many','Most','Some','Such','More','However','Therefore','Nevertheless','Additionally','Furthermore','Consequently','Ultimately','Finally','First','Second','Third','Lastly','Importantly','Similarly','Meanwhile','Instead','Rather','Thus','Hence','Overall','Indeed','Even','Just','Only','Another','Other','Others','Next','Then','Now','Here',
+  // Generic terms
+  'American','United','States','Government','People','Nation','History','Period','Time','Year','Years','Century','Section','Chapter','Page','Part','Study','Notes','Review','Answer','Question','Topic','Cause','Causes','Effect','Effects','Impact','Impacts','Overview','Summary','Introduction','Conclusion',
+  // Standalone adjectives and generic geographies (these appear as terms only if the source defines them)
+  'European','Europe','British','Britain','France','French','Spanish','Spain','Native','Colonial','Colonies','Americas','America','Africa','Asia','Caribbean','Indigenous',
 ]);
 
 function extractTerms(text) {
   const terms = new Set();
 
+  // 1. Anything inside formatting tags
   for (const tag of ['strong', 'em', 'u', 'mark']) {
     const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'gi');
     let m;
     while ((m = re.exec(text)) !== null) {
-      const inner = m[1].replace(/<[^>]+>/g, '').trim();
+      const inner = m[1].replace(/<[^>]+>/g, '').trim().replace(/[,;:]+$/, '');
       if (inner && inner.length > 2 && inner.length < 80) terms.add(inner);
     }
   }
 
   const plain = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
-  const phrases = plain.match(/\b[A-Z][a-zA-Z]+(?:\s+(?:[A-Z][a-zA-Z]+|[&']\s*[A-Z][a-zA-Z]+)){0,3}\b/g) || [];
+
+  // 2. Capitalized phrases allowing short lowercase connectives (of, the, and, de, van, von) and years
+  const phraseRe = /\b[A-Z][a-zA-Z]+(?:\s+(?:of|the|and|de|van|von|del|la|le|[A-Z][a-zA-Z]+|\d{3,4})){0,4}\b/g;
+  const phrases = plain.match(phraseRe) || [];
   for (const p of phrases) {
-    const clean = p.trim();
+    const clean = p.trim().replace(/[,;:]+$/, '').replace(/\s+(of|the|and|de|van|von)$/i, '');
     if (clean.length < 4) continue;
     if (STOPWORDS.has(clean)) continue;
+    // Reject all-caps single words like CAUSES, WARPERIOD
+    if (/^[A-Z]{3,}$/.test(clean)) continue;
     terms.add(clean);
   }
 
-  for (const y of plain.match(/\b1[5-9]\d{2}\b/g) || []) terms.add(y);
-
-  return [...terms].slice(0, 30);
+  return [...terms].slice(0, 28);
 }
 
 async function generateNotes(sourceContent) {
   const terms = extractTerms(sourceContent);
   const checklist = terms.length
-    ? `\n\nMANDATORY TERMS — your output MUST contain a separate entry for EVERY item below. Do not merge them. Do not skip any.\n\n${terms.map((t) => `- ${t}`).join('\n')}`
+    ? `\n\nSUGGESTED TERMS — for each item below that is a genuine historical concept, person, event, or policy from the source, write a dedicated entry in the format above. Skip any item that is a heading, transition word, adjective, fragment, or duplicate of another entry. If an item below is not a real term, ignore it.\n\n${terms.map((t) => `- ${t}`).join('\n')}`
     : '';
 
   if (process.env.GROQ_API_KEY) {
@@ -280,8 +296,7 @@ router.post(
 
     if (!cards.length) cards = heuristicCards(text, max);
     if (!cards.length) return res.status(422).json({ error: 'Could not extract flashcards. Try "Term: definition" lines or fuller sentences.' });
-    res*
-        res.json({ cards, source });
+    res.json({ cards, source });
   })
 );
 
