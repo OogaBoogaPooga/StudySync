@@ -51,7 +51,7 @@ export default function NotesChat() {
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-40 flex items-center gap-2 rounded-full border border-primary/20 bg-card px-4 py-3 text-sm font-medium text-foreground shadow-xl transition-all hover:shadow-2xl hover:-translate-y-0.5"
+          className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-50 flex items-center gap-2 rounded-full border border-primary/20 bg-card px-4 py-3 text-sm font-medium text-foreground shadow-xl transition-all hover:shadow-2xl hover:-translate-y-0.5"
           aria-label="Open notes chat"
         >
           <span className="grid h-6 w-6 place-items-center rounded-full bg-primary/10">
@@ -62,8 +62,7 @@ export default function NotesChat() {
       )}
 
       {open && (
-        <div className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-40 flex h-[600px] max-h-[calc(100vh-6rem)] w-[400px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-2xl animate-fade-in">
-          {/* Header */}
+        <div className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-50 flex h-[600px] max-h-[calc(100vh-6rem)] w-[400px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-2xl animate-fade-in">
           <div className="flex items-center justify-between border-b border-border/60 bg-card/80 px-4 py-3 backdrop-blur">
             <div className="flex items-center gap-2.5">
               <span className="grid h-7 w-7 place-items-center rounded-full bg-primary/10">
@@ -83,7 +82,6 @@ export default function NotesChat() {
             </button>
           </div>
 
-          {/* Scope selector */}
           <div className="border-b border-border/60 px-3 py-2">
             <select
               value={setId}
@@ -98,7 +96,6 @@ export default function NotesChat() {
             </select>
           </div>
 
-          {/* Messages */}
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-4">
             {messages.length === 0 && !busy && (
               <div className="flex h-full flex-col items-center justify-center px-6 text-center">
@@ -150,7 +147,6 @@ export default function NotesChat() {
             </div>
           </div>
 
-          {/* Input */}
           <div className="border-t border-border/60 bg-card/80 px-3 py-2.5 backdrop-blur">
             <div className="flex items-center gap-2 rounded-full border border-border/60 bg-background pl-3.5 pr-1 py-1 transition-all focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10">
               <input
