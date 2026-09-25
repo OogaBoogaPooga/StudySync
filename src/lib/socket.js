@@ -4,11 +4,8 @@ import { getToken } from './api.js';
 let socket = null;
 
 export function getSocket() {
-  if (socket && socket.connected) return socket;
-  if (socket) {
-    try { socket.disconnect(); } catch {}
-    socket = null;
-  }
+  // Reuse existing socket — even if it's still connecting. Never tear down mid-handshake.
+  if (socket) return socket;
   const token = getToken();
   socket = io({
     auth: { token },
