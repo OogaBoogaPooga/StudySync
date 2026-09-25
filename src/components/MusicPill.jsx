@@ -14,6 +14,22 @@ const EQ_STYLE = `
 }
 `;
 
+// Glass tokens — warm amber-tinted, heavy blur
+const GLASS_PANEL =
+  'border border-white/25 dark:border-amber-200/15 ' +
+  'bg-gradient-to-br from-white/30 via-white/15 to-amber-100/20 ' +
+  'dark:from-slate-900/40 dark:via-slate-900/25 dark:to-amber-950/20 ' +
+  'backdrop-blur-3xl backdrop-saturate-200 ' +
+  'shadow-[0_20px_60px_-15px_rgba(217,119,6,0.25),0_8px_24px_-8px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.5)] ' +
+  'dark:shadow-[0_20px_60px_-15px_rgba(217,119,6,0.15),0_8px_24px_-8px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.12)]';
+
+const GLASS_PILL = GLASS_PANEL + ' rounded-full';
+
+const AMBER_BTN =
+  'bg-gradient-to-br from-amber-400 to-yellow-500 text-slate-900 ' +
+  'shadow-[0_4px_14px_-2px_rgba(245,158,11,0.5),inset_0_1px_0_rgba(255,255,255,0.4)] ' +
+  'hover:from-amber-300 hover:to-yellow-400';
+
 export default function MusicPill() {
   const m = useMusic();
   const [expanded, setExpanded] = useState(false);
@@ -52,13 +68,11 @@ export default function MusicPill() {
         ref={wrapperRef}
         className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-40 w-[min(440px,calc(100vw-2rem))]"
       >
+        {/* Expanded panel */}
         <div
           className={cn(
             'mb-2 overflow-hidden rounded-3xl transition-all duration-300 ease-out',
-            'border border-white/20 dark:border-white/10',
-            'bg-white/40 dark:bg-slate-900/50',
-            'backdrop-blur-2xl backdrop-saturate-150',
-            'shadow-[0_16px_48px_-12px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.35)]',
+            GLASS_PANEL,
             expanded ? 'max-h-[70vh] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'
           )}
         >
@@ -70,7 +84,7 @@ export default function MusicPill() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search tracks…"
-                  className="w-full rounded-full border border-white/20 bg-white/40 pl-8 pr-3 py-1.5 text-xs outline-none placeholder:text-foreground/40 focus:border-primary/40 dark:bg-black/20 dark:border-white/10"
+                  className="w-full rounded-full border border-white/30 bg-white/30 pl-8 pr-3 py-1.5 text-xs outline-none placeholder:text-foreground/40 focus:border-amber-400/50 focus:ring-2 focus:ring-amber-400/20 dark:border-white/10 dark:bg-black/20 backdrop-blur-sm"
                   aria-label="Search tracks"
                 />
               </div>
@@ -90,10 +104,10 @@ export default function MusicPill() {
                   key={mo}
                   onClick={() => setMood(mo)}
                   className={cn(
-                    'rounded-full border px-2.5 py-1 text-[10px] font-medium transition-colors',
+                    'rounded-full border px-2.5 py-1 text-[10px] font-medium transition-all',
                     mood === mo
-                      ? 'border-primary/50 bg-primary/15 text-primary'
-                      : 'border-white/20 bg-white/30 text-foreground/70 hover:bg-white/50 dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10'
+                      ? 'border-amber-400/50 bg-gradient-to-br from-amber-400/25 to-yellow-500/20 text-amber-700 dark:text-amber-200'
+                      : 'border-white/30 bg-white/20 text-foreground/70 hover:bg-white/40 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10'
                   )}
                 >
                   {mo}
@@ -113,13 +127,17 @@ export default function MusicPill() {
                     onClick={() => m.selectTrack(t.id)}
                     className={cn(
                       'group flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors',
-                      isCurrent ? 'bg-primary/15 text-primary' : 'hover:bg-white/40 dark:hover:bg-white/5'
+                      isCurrent
+                        ? 'bg-gradient-to-r from-amber-400/25 to-yellow-500/15 text-amber-700 dark:text-amber-200'
+                        : 'hover:bg-white/40 dark:hover:bg-white/5'
                     )}
                   >
                     <span
                       className={cn(
                         'grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[10px] font-semibold',
-                        isCurrent ? 'bg-primary text-primary-foreground' : 'bg-white/50 dark:bg-white/5 text-foreground/60'
+                        isCurrent
+                          ? 'bg-gradient-to-br from-amber-400 to-yellow-500 text-slate-900'
+                          : 'bg-white/40 dark:bg-white/5 text-foreground/60'
                       )}
                     >
                       {isCurrent && m.playing ? (
@@ -141,7 +159,7 @@ export default function MusicPill() {
               })}
             </div>
 
-            <div className="flex items-center justify-between border-t border-white/15 dark:border-white/10 pt-2 text-[10px] text-foreground/60">
+            <div className="flex items-center justify-between border-t border-white/20 dark:border-white/10 pt-2 text-[10px] text-foreground/60">
               <span>{TRACKS.length} tracks · CC0 public domain</span>
               <button
                 onClick={() => m.setMasterEnabled(false)}
@@ -153,15 +171,8 @@ export default function MusicPill() {
           </div>
         </div>
 
-        <div
-          className={cn(
-            'flex items-center gap-2 rounded-full px-3 py-2 transition-all duration-300',
-            'border border-white/25 dark:border-white/10',
-            'bg-white/45 dark:bg-slate-900/55',
-            'backdrop-blur-2xl backdrop-saturate-150',
-            'shadow-[0_12px_36px_-8px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.4)]'
-          )}
-        >
+        {/* The pill */}
+        <div className={cn('flex items-center gap-2 px-3 py-2', GLASS_PILL)}>
           <button
             onClick={() => setExpanded((e) => !e)}
             className="grid h-7 w-7 place-items-center rounded-full text-foreground/60 hover:bg-white/40 dark:hover:bg-white/10"
@@ -181,7 +192,7 @@ export default function MusicPill() {
             onClick={m.toggleShuffle}
             className={cn(
               'grid h-7 w-7 place-items-center rounded-full transition-colors',
-              m.shuffle ? 'text-primary bg-primary/10' : 'text-foreground/50 hover:bg-white/40 dark:hover:bg-white/10'
+              m.shuffle ? 'text-amber-600 dark:text-amber-300 bg-amber-400/15' : 'text-foreground/50 hover:bg-white/40 dark:hover:bg-white/10'
             )}
             aria-label="Shuffle"
             title={m.shuffle ? 'Shuffle on' : 'Shuffle off'}
@@ -199,7 +210,10 @@ export default function MusicPill() {
 
           <button
             onClick={m.toggle}
-            className="grid h-9 w-9 place-items-center rounded-full bg-primary text-primary-foreground shadow-md transition-transform hover:scale-[1.04] active:scale-95"
+            className={cn(
+              'grid h-9 w-9 place-items-center rounded-full transition-transform hover:scale-[1.04] active:scale-95',
+              AMBER_BTN
+            )}
             aria-label={m.playing ? 'Pause' : 'Play'}
           >
             {m.playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 ml-0.5" />}
@@ -217,7 +231,7 @@ export default function MusicPill() {
             onClick={m.cycleLoop}
             className={cn(
               'grid h-7 w-7 place-items-center rounded-full transition-colors',
-              m.loopMode !== 'none' ? 'text-primary bg-primary/10' : 'text-foreground/50 hover:bg-white/40 dark:hover:bg-white/10'
+              m.loopMode !== 'none' ? 'text-amber-600 dark:text-amber-300 bg-amber-400/15' : 'text-foreground/50 hover:bg-white/40 dark:hover:bg-white/10'
             )}
             aria-label={`Loop: ${m.loopMode}`}
             title={`Loop: ${m.loopMode}`}
@@ -235,7 +249,7 @@ export default function MusicPill() {
               {m.muted || m.volume === 0 ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
             </button>
             {showVolume && (
-              <div className="absolute bottom-full right-0 mb-2 rounded-2xl border border-white/20 bg-white/60 p-2 shadow-lg backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/70">
+              <div className={cn('absolute bottom-full right-0 mb-2 rounded-2xl p-2', GLASS_PANEL)}>
                 <input
                   type="range"
                   min="0"
@@ -243,7 +257,7 @@ export default function MusicPill() {
                   step="0.01"
                   value={m.muted ? 0 : m.volume}
                   onChange={(e) => { m.setMuted(false); m.setVolume(Number(e.target.value)); }}
-                  className="h-1 w-28 accent-primary"
+                  className="h-1 w-28 accent-amber-500"
                   aria-label="Volume"
                 />
               </div>
