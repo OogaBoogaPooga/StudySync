@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
-import mammoth from 'mammoth'; import PDFParser from 'pdf2json';
+import mammoth from 'mammoth';
+import PDFParser from 'pdf2json';
 import * as officeparserModule from 'officeparser';
 import { z } from 'zod';
 import { requireAuth, validate, wrap } from '../middleware/auth.js';
@@ -17,10 +18,11 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
-async function callAI({ systemPrompt, userPrompt, jsonMode = false }) {
+async function callAI({ systemPrompt, userPrompt, jsonMode = false, maxTokens = 4000 }) {
   const body = {
     model: process.env.GROQ_MODEL || 'openai/gpt-oss-120b',
     temperature: 0.3,
+    max_tokens: maxTokens,
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
@@ -38,17 +40,12 @@ async function callAI({ systemPrompt, userPrompt, jsonMode = false }) {
   });
   if (!res.ok) {
     const detail = await res.text().catch(() => '');
-    throw new Error(`Groq error (${res.status}): ${detail.slice(0, 200)}`);
+    throw new Error(`Groq error (${res.status}): ${detail.slice(0, 300)}`);
   }
   const data = await res.json();
   return data.choices[0].message.content;
 }
 
-/**
- * Normalizes HTML so bold/italic/highlight/underline from Word, Google Docs,
- * and other rich-text sources become plain <strong>, <em>, <u>, <mark> tags
- * that the AI can recognize.
- */
 function normalizeHtml(html) {
   return html
     .replace(/<span[^>]*font-weight:\s*(bold|[6-9]00)[^>]*>([\s\S]*?)<\/span>/gi, '<strong>$2</strong>')
@@ -65,11 +62,7 @@ function normalizeHtml(html) {
     .replace(/<p>\s*<\/p>/gi, '')
     .replace(/<br\s*\/?>/gi, ' ');
 }
-/**
- * Extracts text from a PDF while preserving bold and italic runs.
- * Uses font-name inspection — works when the PDF embeds named fonts like
- * "Arial-BoldMT". Won't work for scanned PDFs or obfuscated fonts.
- */
+
 function extractPdfHtml(buffer) {
   return new Promise((resolve, reject) => {
     const parser = new PDFParser();
@@ -78,7 +71,6 @@ function extractPdfHtml(buffer) {
       try {
         const out = [];
         for (const page of data.Pages || []) {
-          // Build a font-name lookup so we can detect bold by name when the flag is missing
           const fontMap = {};
           for (const f of page.Fonts || []) {
             fontMap[f.id] = (f.name || '').toLowerCase();
@@ -93,7 +85,6 @@ function extractPdfHtml(buffer) {
               if (!t) continue;
               const ts = run.TS || [];
               const fontName = fontMap[ts[0]] || '';
-              // Detect bold via flag OR font name
               const boldByFlag = !!ts[2];
               const boldByName = /bold|black|heavy|semibold|demi|bd\b/.test(fontName);
               const italicByFlag = !!ts[3];
@@ -120,63 +111,32 @@ function extractPdfHtml(buffer) {
   });
 }
 
-const NOTES_SYSTEM_PROMPT = `You are turning source material into a student's personal study notes. Not a study guide, not a summary, not a textbook. Study notes in the exact format a real student writes them in class.
+const NOTES_SYSTEM_PROMPT = `You turn source material into a student's personal study notes. Not a study guide, not a summary. Notes the way a student writes them in class.
 
-THE FORMAT — this is the most important rule:
-Every entry follows this exact shape, on its own line:
+FORMAT — every entry looks exactly like this, one per paragraph:
+<p><strong>Term:</strong> casual explanation, 1-3 sentences.</p>
 
-<p><strong>Term:</strong> casual explanation of what it is or does.</p>
+RULES:
+1. Pull out every named event, war, treaty, battle, person, place, concept, policy, and year from the source. Each one gets its own entry.
+2. Do not skip anyone or anything. If a person is named (George Washington, Benjamin Franklin, King George III, Chief Pontiac), they get their own entry.
+3. Never split a term across punctuation. "Proclamation of 1763" is ONE term, written as <strong>Proclamation of 1763:</strong>. Never write "Proclamation of:" then "1763:" separately. Never put a period or comma right before the colon.
+4. Never invent facts or years. Only use what's in the source.
+5. Preserve every date, name, number, and citation marker like [1] or [2] exactly as written.
+6. If the source has <strong>, <em>, <u>, or <mark> tags, every term inside those tags MUST get its own entry.
+7. Write casually. "Basically," "this is when," "in other words" are fine. Match the source's voice.
+8. No Key Terms section. No Key Takeaways section. No Cause and Effect section. Everything is inline.
 
-- The term is bolded with <strong>.
-- Immediately followed by a colon.
-- Then a casual explanation, 1–3 sentences, same line.
-- One entry per paragraph. No bullet lists. No headers per term. No sub-bullets.
+Respond ONLY with JSON: {"title":"short title","html":"<p><strong>Term:</strong> explanation</p>"}. Only use these tags: h2, h3, p, ul, ol, li, strong, em, u, mark.`
 
-CRITICAL — PRESERVING BOLDED TERMS FROM THE SOURCE:
-The source text may contain <strong>, <em>, <u>, or <mark> tags. These represent terms the student's teacher emphasized or the student highlighted.
-- EVERY term that appears in <strong>, <em>, <u>, or <mark> in the source MUST appear as a bolded term (<strong>) at the start of its own paragraph in your output.
-- Do not skip any emphasized term. Even if it seems minor. Even if it appears mid-sentence in the source.
-- If the source has an emphasized term with an explanation right after it, put the term in <strong> at the start of the paragraph and the explanation after the colon.
-- If the source has an emphasized term with no explanation, use the surrounding sentences to write a short explanation for it.
-- Count the emphasized terms in the source. Count the bolded entries in your output. The numbers must match.
-
-VOICE:
-- Write laid, back and professional, like a advanced student explaining to a classmate. "Basically," "this is when," "in other words," "think of it as" are all fine.
-- Keep the student's shorthand. If they wrote "more then just," keep it.
-- Short parenthetical asides for context are welcome. Example: "(people start going to church again)".
-- Do NOT clean up the source's grammar to sound formal. Match the source's voice.
-- Keep explanations short. This is a notes, not an essay.
-
-PRESERVE FROM SOURCE:
-- Keep citation markers like [1], [2], [3] exactly where they appeared.
-- Keep every date, name, treaty, court case, and number.
-
-
-DO NOT:
-- Do NOT add a "Key Terms" section at the end.
-- Do NOT add a "Key Takeaways" section.
-- Do NOT add a "Cause and Effect" section.
-- Do NOT use bullet lists (<ul>/<ol>) unless the source itself is a list.
-- Do NOT add headings for every entry. Only use <h2> when the source genuinely shifts to a new topic. 
-- Do NOT split a term across punctuation. "Proclamation of 1763" is ONE term. Never write "Proclamation of:" followed by "1763:" as separate entries. 
-- NEVER add a period or comma immediately before the colon. Write "Proclamation of 1763:" not "Proclamation of 1763.:" or "Pontiac's Rebellion,:". 
-- Do NOT invent dates or years. If the source says 1763, write 1763. Never change a year. 
-- If a person is named (George Washington, Benjamin Franklin, King George III, Chief Pontiac), that person gets their own <strong>Person's Name:</strong> entry describing what they did. Do not bury them inside another entry.
-
-Respond ONLY with JSON: {"title":"short descriptive title","html":"<h2>Topic</h2><p><strong>Term:</strong> explanation</p>"}. Use only these HTML tags: h2, h3, p, ul, ol, li, strong, em, u, mark. Do not include a top-level h1.`
-
-/** Pulls out proper nouns, dates, and tagged terms as a mandatory checklist */
 function extractTerms(text) {
   const terms = new Set();
   const stopwords = new Set(['The','And','This','That','They','These','Those','However','Nevertheless','Therefore','Because','When','While','After','Before','Importantly','Ultimately','First','Second','Third','Lastly','By','In','On','At','To','Of','For','With','From','As','If','It','Its','But','Or','So','Yet','Also','Both','Each','Every','Some','Many','Most','Such','Then','Than','Here','There','Where','What','Which','Who','Whom','Whose','Why','How']);
 
-  // Anything wrapped in formatting tags
   for (const tag of text.match(/<(strong|em|u|mark)>([^<]+)<\/\1>/g) || []) {
     const inner = tag.replace(/<[^>]+>/g, '').trim();
     if (inner) terms.add(inner);
   }
 
-  // Proper-noun phrases (1-4 capitalized words in a row)
   const plain = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
   const phrases = plain.match(/\b[A-Z][a-zA-Z]+(?:\s+(?:[A-Z][a-zA-Z]+|[&']\s*[A-Z][a-zA-Z]+)){0,3}\b/g) || [];
   for (const p of phrases) {
@@ -186,24 +146,24 @@ function extractTerms(text) {
     terms.add(clean);
   }
 
-  // Years
   for (const y of plain.match(/\b1[5-9]\d{2}\b/g) || []) terms.add(y);
 
-  return [...terms].slice(0, 80);
+  return [...terms].slice(0, 30);
 }
 
 async function generateNotes(sourceContent) {
   const terms = extractTerms(sourceContent);
   const checklist = terms.length
-    ? `\n\nMANDATORY TERMS — your output MUST contain a separate <strong>Term:</strong> entry for EVERY item in this list. Do not merge them. Do not mention them inside other entries. Each one gets its own paragraph.\n\n${terms.map((t) => `- ${t}`).join('\n')}\n\nIf any item is missing from your output, the response is wrong. Count them and verify.`
+    ? `\n\nMANDATORY TERMS — your output MUST contain a separate <strong>Term:</strong> entry for EVERY item below. Do not merge them. Do not skip any.\n\n${terms.map((t) => `- ${t}`).join('\n')}`
     : '';
 
   if (process.env.GROQ_API_KEY) {
     try {
       const content = await callAI({
         systemPrompt: NOTES_SYSTEM_PROMPT + checklist,
-        userPrompt: sourceContent.slice(0, 24000),
+        userPrompt: sourceContent.slice(0, 20000),
         jsonMode: true,
+        maxTokens: 8000,
       });
       const parsed = JSON.parse(content);
       if (parsed.html) return { title: parsed.title || 'AI notes', html: parsed.html, source: 'ai' };
@@ -215,7 +175,17 @@ async function generateNotes(sourceContent) {
   return { ...heuristicNotes(plain), source: 'heuristic' };
 }
 
-/* ---------- Flashcards ---------- */
+function heuristicNotes(text) {
+  const plain = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  const sentences = plain.split(/(?<=[.!?])\s+/).slice(0, 60);
+  const paragraphs = [];
+  for (let i = 0; i < sentences.length; i += 4) {
+    const chunk = sentences.slice(i, i + 4).join(' ');
+    if (chunk) paragraphs.push(`<p>${chunk}</p>`);
+  }
+  const title = (plain.split(/[.!?]/)[0] || 'Notes').slice(0, 60).trim();
+  return { title, html: `<h2>Summary</h2>${paragraphs.join('')}` };
+}
 
 function heuristicCards(text, max = 12) {
   const cards = [];
@@ -232,18 +202,8 @@ function heuristicCards(text, max = 12) {
   const seen = new Set();
   return cards.filter((c) => !seen.has(c.front) && seen.add(c.front)).slice(0, max);
 }
-function heuristicNotes(text) {
-  const plain = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-  const sentences = plain.split(/(?<=[.!?])\s+/).slice(0, 60);
-  const paragraphs = [];
-  for (let i = 0; i < sentences.length; i += 4) {
-    const chunk = sentences.slice(i, i + 4).join(' ');
-    if (chunk) paragraphs.push(`<p>${chunk}</p>`);
-  }
-  const title = (plain.split(/[.!?]/)[0] || 'Notes').slice(0, 60).trim();
-  return { title, html: `<h2>Summary</h2>${paragraphs.join('')}` };
-}
 
+/* ---------- Flashcards ---------- */
 
 router.post('/flashcards', validate(z.object({ text: z.string().trim().min(20, 'Paste at least a few sentences'), max: z.coerce.number().int().min(1).max(30).default(12) })), wrap(async (req, res) => {
   const { text, max } = req.body;
@@ -256,6 +216,7 @@ router.post('/flashcards', validate(z.object({ text: z.string().trim().min(20, '
         systemPrompt: `You are a study assistant. Summarize the student's notes into up to ${max} high-quality flashcards. Respond ONLY with JSON: {"cards":[{"front":"question","back":"concise answer"}]}. Questions should test understanding, not trivia. Keep answers under 40 words.`,
         userPrompt: text.slice(0, 12000),
         jsonMode: true,
+        maxTokens: 3000,
       });
       const parsed = JSON.parse(content);
       cards = (parsed.cards || []).filter((c) => c.front && c.back).slice(0, max);
@@ -270,7 +231,7 @@ router.post('/flashcards', validate(z.object({ text: z.string().trim().min(20, '
   res.json({ cards, source });
 }));
 
-/* ---------- Notes (pasted text — may be HTML) ---------- */
+/* ---------- Notes (pasted text) ---------- */
 
 router.post('/notes', validate(z.object({ text: z.string().trim().min(50, 'Paste at least a paragraph of source text') })), wrap(async (req, res) => {
   const normalized = normalizeHtml(req.body.text);
