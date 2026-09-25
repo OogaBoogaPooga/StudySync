@@ -58,3 +58,17 @@ export const submitQuiz = (id, answers) =>
   api(`/quizzes/${id}/submit`, { method: 'POST', body: { answers } });
 
 export const getQuizAttemptsBySet = (setId) => api(`/quizzes/by-set/${setId}`);
+
+// ---- Infinite Campus ----
+export const getICStatus = () => api('/ic/status');
+
+export const saveICCredentials = (district, state, username, password) =>
+  api('/ic/credentials', { method: 'POST', body: { district, state, username, password } });
+
+export const disconnectIC = () => api('/ic/credentials', { method: 'DELETE' });
+
+export const syncICGrades = () => api('/ic/sync', { method: 'POST' });
+
+// ---- Grade snapshots ----
+export const updateClass = (id, body) =>
+  api(`/classes/${id}`, { method: 'PATCH', body });
