@@ -1,8 +1,12 @@
 /**
  * Real-time study rooms: chat, shared whiteboard, quick polls.
+ * Collaborative note editing: Yjs document sync + awareness relay.
  * State is held in memory (resets on restart) — simple and dependency-free.
  */
-const rooms = new Map(); // code -> { users: Map<socketId, name>, messages: [], canvas: [], poll: null }
+import * as Y from 'yjs';
+
+const rooms = new Map(); // code -> { users: Map, messages: [], canvas: [], poll: null }
+const yjsRooms = new Map(); // setId -> { doc: Y.Doc, clients: Set<socketId>, seeded: boolean }
 const MAX_MESSAGES = 200;
 const MAX_CANVAS_OBJECTS = 2000;
 
@@ -20,9 +24,19 @@ function pollView(poll) {
   return { question: poll.question, options: poll.options, counts, total: Object.keys(poll.votes).length };
 }
 
+function cleanupYjs(setId) {
+  const room = yjsRooms.get(setId);
+  if (room && room.clients.size === 0) {
+    room.doc.destroy();
+    yjsRooms.delete(setId);
+  }
+}
+
 export function setupSockets(io) {
   io.on('connection', (socket) => {
     let current = null; // room code this socket has joined
+
+    /* ---------- Study rooms (existing) ---------- */
 
     socket.on('room:join', ({ code, name }) => {
       code = clean(code, 12).toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -34,7 +48,6 @@ export function setupSockets(io) {
       room.users.set(socket.id, name);
       socket.join(code);
 
-      // Send full state to the newcomer, then notify others
       socket.emit('room:state', {
         code,
         users: [...room.users.values()],
@@ -56,7 +69,6 @@ export function setupSockets(io) {
       io.to(current).emit('chat:message', msg);
     });
 
-    // Whiteboard: each finished stroke is serialized Fabric.js JSON
     socket.on('draw:path', (obj) => {
       if (!current || !obj || typeof obj !== 'object') return;
       const room = getRoom(current);
@@ -85,7 +97,7 @@ export function setupSockets(io) {
       if (!current) return;
       const room = getRoom(current);
       if (!room.poll || !Number.isInteger(index) || index < 0 || index >= room.poll.options.length) return;
-      room.poll.votes[socket.id] = index; // one vote per person, re-voting allowed
+      room.poll.votes[socket.id] = index;
       io.to(current).emit('poll:update', pollView(room.poll));
     });
 
@@ -95,15 +107,85 @@ export function setupSockets(io) {
       io.to(current).emit('poll:update', null);
     });
 
-    socket.on('disconnect', () => {
-      if (!current) return;
-      const room = rooms.get(current);
+    /* ---------- Collaborative note editing (Yjs relay) ---------- */
+
+    socket.on('notes:yjs-join', ({ setId }) => {
+      setId = clean(setId, 40);
+      if (!setId) return;
+
+      let room = yjsRooms.get(setId);
+      if (!room) {
+        room = { doc: new Y.Doc(), clients: new Set(), seeded: false };
+        yjsRooms.set(setId, room);
+      }
+      room.clients.add(socket.id);
+      socket.join(`yjs:${setId}`);
+
+      const state = Y.encodeStateAsUpdate(room.doc);
+      const shouldSeed = !room.seeded;
+      if (shouldSeed) room.seeded = true;
+
+      socket.emit('notes:yjs-state', {
+        setId,
+        state: Array.from(state),
+        shouldSeed,
+      });
+    });
+
+    socket.on('notes:yjs-seed-applied', ({ setId }) => {
+      setId = clean(setId, 40);
+      const room = yjsRooms.get(setId);
+      if (room) room.seeded = true;
+    });
+
+    socket.on('notes:yjs-update', ({ setId, update }) => {
+      setId = clean(setId, 40);
+      if (!setId || !Array.isArray(update)) return;
+      const room = yjsRooms.get(setId);
       if (!room) return;
-      const name = room.users.get(socket.id);
-      room.users.delete(socket.id);
-      io.to(current).emit('room:users', [...room.users.values()]);
-      if (name) socket.to(current).emit('chat:message', { system: true, text: `${name} left`, at: Date.now() });
-      if (room.users.size === 0) rooms.delete(current); // free memory for empty rooms
+      try {
+        Y.applyUpdate(room.doc, new Uint8Array(update));
+        socket.to(`yjs:${setId}`).emit('notes:yjs-update', { setId, update });
+      } catch (e) {
+        console.warn('[yjs] apply failed', e.message);
+      }
+    });
+
+    socket.on('notes:yjs-awareness', ({ setId, update }) => {
+      setId = clean(setId, 40);
+      if (!setId || !Array.isArray(update)) return;
+      socket.to(`yjs:${setId}`).emit('notes:yjs-awareness', { setId, update });
+    });
+
+    socket.on('notes:yjs-leave', ({ setId }) => {
+      setId = clean(setId, 40);
+      if (!setId) return;
+      const room = yjsRooms.get(setId);
+      if (!room) return;
+      room.clients.delete(socket.id);
+      socket.leave(`yjs:${setId}`);
+      cleanupYjs(setId);
+    });
+
+    /* ---------- Disconnect ---------- */
+
+    socket.on('disconnect', () => {
+      if (current) {
+        const room = rooms.get(current);
+        if (room) {
+          const name = room.users.get(socket.id);
+          room.users.delete(socket.id);
+          io.to(current).emit('room:users', [...room.users.values()]);
+          if (name) socket.to(current).emit('chat:message', { system: true, text: `${name} left`, at: Date.now() });
+          if (room.users.size === 0) rooms.delete(current);
+        }
+      }
+      for (const [setId, room] of yjsRooms) {
+        if (room.clients.has(socket.id)) {
+          room.clients.delete(socket.id);
+          cleanupYjs(setId);
+        }
+      }
     });
   });
 }
