@@ -162,7 +162,6 @@ async function generateNotes(sourceContent) {
       const content = await callAI({
         systemPrompt: NOTES_SYSTEM_PROMPT + checklist,
         userPrompt: sourceContent.slice(0, 20000),
-        jsonMode: true,
         maxTokens: 8000,
       });
       const parsed = JSON.parse(content);
