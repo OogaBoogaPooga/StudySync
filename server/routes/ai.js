@@ -126,7 +126,7 @@ RULES:
 7. Write casually. "Basically," "this is when," "in other words" are fine. Match the source's voice.
 8. No Key Terms section. No Key Takeaways section. No Cause and Effect section. Everything is inline.
 
-Respond ONLY with JSON: {"title":"short title","html":"<p><strong>Term:</strong> explanation</p>"}. Only use these tags: h2, h3, p, ul, ol, li, strong, em, u, mark.`
+OUTPUT FORMAT — this is critical: Respond with the HTML content ONLY. No JSON. No markdown. No backticks. No preamble like "Here are your notes:". No explanation. Start your response immediately with the first tag.  On the very first line, output the title as a plain text line ending with a newline, then start the HTML on the next line. Example:  Seven Years' War <p><strong>Seven Years' War:</strong> the 1754-1763 conflict between Britain and France.</p> <p><strong>George Washington:</strong> led the Virginia militia and surrendered at Fort Necessity.</p>  Only use these tags: h2, h3, p, ul, ol, li, strong, em, u, mark.`
 
 function extractTerms(text) {
   const terms = new Set();
