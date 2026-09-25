@@ -13,7 +13,8 @@ import sessionRoutes from './routes/sessions.js';
 import { setRoutes, shareRoutes } from './routes/sets.js';
 import aiRoutes from './routes/ai.js';
 import quizzesRoutes from './routes/quizzes.js';
-import shareEditRoutes from './routes/shareEdit.js';
+import shareEditRoutes from './routes/shareEdit.js'; 
+import infiniteCampusRoutes from './routes/infinitecampus.js';
 import { setupSockets } from './socket.js';
 
 if (!process.env.JWT_SECRET) {
