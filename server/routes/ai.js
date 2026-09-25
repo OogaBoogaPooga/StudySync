@@ -228,6 +228,18 @@ function heuristicCards(text, max = 12) {
   const seen = new Set();
   return cards.filter((c) => !seen.has(c.front) && seen.add(c.front)).slice(0, max);
 }
+function heuristicNotes(text) {
+  const plain = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  const sentences = plain.split(/(?<=[.!?])\s+/).slice(0, 60);
+  const paragraphs = [];
+  for (let i = 0; i < sentences.length; i += 4) {
+    const chunk = sentences.slice(i, i + 4).join(' ');
+    if (chunk) paragraphs.push(`<p>${chunk}</p>`);
+  }
+  const title = (plain.split(/[.!?]/)[0] || 'Notes').slice(0, 60).trim();
+  return { title, html: `<h2>Summary</h2>${paragraphs.join('')}` };
+}
+
 
 router.post('/flashcards', validate(z.object({ text: z.string().trim().min(20, 'Paste at least a few sentences'), max: z.coerce.number().int().min(1).max(30).default(12) })), wrap(async (req, res) => {
   const { text, max } = req.body;
