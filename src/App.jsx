@@ -13,7 +13,7 @@ const StudySet = lazy(() => import('./pages/StudySet.jsx'));
 const SharedSet = lazy(() => import('./pages/SharedSet.jsx'));
 const Grades = lazy(() => import('./pages/Grades.jsx'));
 const Rooms = lazy(() => import('./pages/Rooms.jsx'));
-const Room = lazy(() => import('./pages/Room.jsx'));
+const Room = lazy(() => import('./pages/Room.jsx')); const Quiz = lazy(() => import('./pages/Quiz.jsx'));
 
 const Spinner = () => (
   <div className="flex h-[60vh] items-center justify-center" role="status" aria-label="Loading">
