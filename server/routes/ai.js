@@ -145,7 +145,7 @@ VOICE:
 - Keep the student's shorthand. If they wrote "more then just," keep it.
 - Short parenthetical asides for context are welcome. Example: "(people start going to church again)".
 - Do NOT clean up the source's grammar to sound formal. Match the source's voice.
-- Keep explanations short. This is a cheat sheet, not an essay.
+- Keep explanations short. This is a notes, not an essay.
 
 PRESERVE FROM SOURCE:
 - Keep citation markers like [1], [2], [3] exactly where they appeared.
@@ -157,7 +157,11 @@ DO NOT:
 - Do NOT add a "Key Takeaways" section.
 - Do NOT add a "Cause and Effect" section.
 - Do NOT use bullet lists (<ul>/<ol>) unless the source itself is a list.
-- Do NOT add headings for every entry. Only use <h2> when the source genuinely shifts to a new topic.
+- Do NOT add headings for every entry. Only use <h2> when the source genuinely shifts to a new topic. 
+- Do NOT split a term across punctuation. "Proclamation of 1763" is ONE term. Never write "Proclamation of:" followed by "1763:" as separate entries. 
+- NEVER add a period or comma immediately before the colon. Write "Proclamation of 1763:" not "Proclamation of 1763.:" or "Pontiac's Rebellion,:". 
+- Do NOT invent dates or years. If the source says 1763, write 1763. Never change a year. 
+- If a person is named (George Washington, Benjamin Franklin, King George III, Chief Pontiac), that person gets their own <strong>Person's Name:</strong> entry describing what they did. Do not bury them inside another entry.
 
 Respond ONLY with JSON: {"title":"short descriptive title","html":"<h2>Topic</h2><p><strong>Term:</strong> explanation</p>"}. Use only these HTML tags: h2, h3, p, ul, ol, li, strong, em, u, mark. Do not include a top-level h1.`
 
