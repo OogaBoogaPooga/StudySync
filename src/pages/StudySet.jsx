@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Bold, Italic, Underline, List, ListOrdered, Heading2, Link2, Sparkles, Share2, Plus, Trash2, ArrowLeft, Play } from 'lucide-react';
-import { api } from '@/lib/api.js';
+import { api, generateQuiz } from '@/lib/api.js';
 import { useApp } from '@/lib/store.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card.jsx';
@@ -11,6 +11,8 @@ import { Dialog, DialogContent } from '@/components/ui/dialog.jsx';
 export default function StudySet() {
   const { id } = useParams();
   const { toast } = useApp();
+  const navigate = useNavigate();
+  const [quizBusy, setQuizBusy] = useState(false);
   const [set, setSet] = useState(null);
   const [saving, setSaving] = useState('');
   const [card, setCard] = useState({ front: '', back: '' });
@@ -50,7 +52,7 @@ export default function StudySet() {
   const removeCard = async (c) => {
     try { await api(`/sets/${id}/cards/${c.id}`, { method: 'DELETE' }); setSet({ ...set, cards: set.cards.filter((x) => x.id !== c.id) }); } catch (err) { toast(err.message, 'error'); }
   };
-  const share = async () => {
+  const takeQuiz = async () => {     setQuizBusy(true);     try {       const res = await generateQuiz(id, 10, ['mcq', 'short']);       const quizId = res.quiz?.id || res.id;       navigate(`/quiz/${quizId}`);     } catch (e) {       toast(e.message, 'error');     } finally {       setQuizBusy(false);     }   };   const share = async () => {
     const url = `${location.origin}/share/${set.shareId}`;
     try { await navigator.clipboard.writeText(url); toast('Share link copied!'); } catch { prompt('Copy this link:', url); }
   };
@@ -64,7 +66,7 @@ export default function StudySet() {
           <input aria-label="Set title" defaultValue={set.title} onBlur={(e) => e.target.value !== set.title && api(`/sets/${id}`, { method: 'PUT', body: { title: e.target.value } }).then(() => toast('Title saved')).catch((err) => toast(err.message, 'error'))} className="bg-transparent text-2xl font-bold outline-none focus:border-b border-primary" /></div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={share}><Share2 className="h-4 w-4" />Share</Button>
-          <Button variant="outline" size="sm" onClick={() => setAiOpen(true)}><Sparkles className="h-4 w-4 text-violet-500" />AI flashcards</Button>
+          <Button variant="outline" size="sm" onClick={() => setAiOpen(true)}><Sparkles className="h-4 w-4 text-violet-500" />AI flashcards</Button>           <Button variant="outline" size="sm" disabled={!set.cards.length || quizBusy} onClick={takeQuiz}>             {quizBusy ? 'Generating…' : 'AI Quiz'}           </Button>
           <Button variant="gradient" size="sm" disabled={!set.cards.length} onClick={() => setStudy(true)}><Play className="h-4 w-4" />Study ({set.cards.length})</Button>
         </div>
       </div>
