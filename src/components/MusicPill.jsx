@@ -64,7 +64,7 @@ export default function MusicPill() {
       <style>{EQ_STYLE}</style>
       <div
         ref={wrapperRef}
-        className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-40 w-[min(440px,calc(100vw-2rem))]"
+        className="fixed bottom-20 md:bottom-6 z-40 left-3 right-3 md:left-[264px] md:right-auto md:w-[440px] md:max-w-[calc(100vw-288px)]"
       >
         <div
           className={cn(
