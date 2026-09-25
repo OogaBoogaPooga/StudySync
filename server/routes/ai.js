@@ -150,20 +150,15 @@ FEW-SHOT EXAMPLES — match this style exactly:
 Now process the source below. Write one entry per significant historical term, person, event, document, or policy. Skip all headings, transition words, standalone adjectives, and generic geographies.`;
 
 const STOPWORDS = new Set([
-  // Articles, pronouns, prepositions
   'The','This','That','These','Those','They','Their','There','Which','When','Where','What','While','With','From','Into','Upon','After','Before','During','Under','Over','About','Between','Among','Along','Across','Through','Because','Since','Until','Unless','Within','Without','Against',
-  // Transition words
   'Also','Both','Each','Many','Most','Some','Such','More','However','Therefore','Nevertheless','Additionally','Furthermore','Consequently','Ultimately','Finally','First','Second','Third','Lastly','Importantly','Similarly','Meanwhile','Instead','Rather','Thus','Hence','Overall','Indeed','Even','Just','Only','Another','Other','Others','Next','Then','Now','Here',
-  // Generic terms
   'American','United','States','Government','People','Nation','History','Period','Time','Year','Years','Century','Section','Chapter','Page','Part','Study','Notes','Review','Answer','Question','Topic','Cause','Causes','Effect','Effects','Impact','Impacts','Overview','Summary','Introduction','Conclusion',
-  // Standalone adjectives and generic geographies (these appear as terms only if the source defines them)
   'European','Europe','British','Britain','France','French','Spanish','Spain','Native','Colonial','Colonies','Americas','America','Africa','Asia','Caribbean','Indigenous',
 ]);
 
 function extractTerms(text) {
   const terms = new Set();
 
-  // 1. Anything inside formatting tags
   for (const tag of ['strong', 'em', 'u', 'mark']) {
     const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'gi');
     let m;
@@ -175,14 +170,12 @@ function extractTerms(text) {
 
   const plain = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 
-  // 2. Capitalized phrases allowing short lowercase connectives (of, the, and, de, van, von) and years
   const phraseRe = /\b[A-Z][a-zA-Z]+(?:\s+(?:of|the|and|de|van|von|del|la|le|[A-Z][a-zA-Z]+|\d{3,4})){0,4}\b/g;
   const phrases = plain.match(phraseRe) || [];
   for (const p of phrases) {
     const clean = p.trim().replace(/[,;:]+$/, '').replace(/\s+(of|the|and|de|van|von)$/i, '');
     if (clean.length < 4) continue;
     if (STOPWORDS.has(clean)) continue;
-    // Reject all-caps single words like CAUSES, WARPERIOD
     if (/^[A-Z]{3,}$/.test(clean)) continue;
     terms.add(clean);
   }
@@ -421,7 +414,7 @@ router.post('/chat', validate(z.object({
     });
   }
 
-   const top = rankCards(message, cards);
+  const top = rankCards(message, cards);
   const used = top.length ? top : cards.slice(0, 12);
   const passages = used
     .map((c, i) => '[' + (i + 1) + '] ' + c.front + ' - ' + c.back + ' (from "' + c.setTitle + '")')
@@ -455,9 +448,10 @@ router.post('/chat', validate(z.object({
     ],
   });
 
-    res.json({
+  res.json({
     reply,
     sources: used.map((c) => ({ front: c.front, back: c.back, setTitle: c.setTitle })),
   });
+}));
 
 export default router;
