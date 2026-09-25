@@ -20,6 +20,13 @@ model User {
   chatMessages ChatMessage[]
   quizzes      Quiz[]
   quizAttempts QuizAttempt[]
+
+  // Infinite Campus integration — credentials stored encrypted (AES-256-GCM)
+  icDistrict    String?
+  icState       String?
+  icUsername    String?
+  icPasswordEnc String?
+  icLastSync    DateTime?
 }
 
 model Class {
@@ -30,6 +37,12 @@ model Class {
   userId      String
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   assignments Assignment[]
+
+  // Manual or synced grade snapshot — overrides assignment-based calc when set
+  snapshotScore     Float?
+  snapshotMax       Float?
+  snapshotUpdatedAt DateTime?
+  snapshotSource    String? // 'manual' | 'infinitecampus'
 }
 
 model Assignment {
@@ -39,10 +52,9 @@ model Assignment {
   dueDate     DateTime
   progress    Int      @default(0) // 0-100
   completed   Boolean  @default(false)
-  // Grade fields (null score = not graded yet)
   score       Float?
   maxScore    Float    @default(100)
-  weight      Float    @default(1) // relative weight inside the class
+  weight      Float    @default(1)
   classId     String?
   class       Class?   @relation(fields: [classId], references: [id], onDelete: SetNull)
   userId      String
@@ -52,7 +64,7 @@ model Assignment {
 
 model StudySession {
   id          String   @id @default(cuid())
-  type        String   @default("focus") // focus | break
+  type        String   @default("focus")
   durationMin Int
   notes       String?
   startedAt   DateTime @default(now())
@@ -63,8 +75,8 @@ model StudySession {
 model StudySet {
   id        String      @id @default(cuid())
   title     String
-  content   String      @default("") // rich-text HTML
-  shareId   String      @unique @default(cuid()) // public share link token
+  content   String      @default("")
+  shareId   String      @unique @default(cuid())
   userId    String
   user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   cards     Flashcard[]
