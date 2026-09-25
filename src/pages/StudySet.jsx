@@ -15,6 +15,7 @@ export default function StudySet() {
   const navigate = useNavigate();
   const [quizBusy, setQuizBusy] = useState(false);
   const [set, setSet] = useState(null);
+  const [loadError, setLoadError] = useState('');
   const [saving, setSaving] = useState('');
   const [card, setCard] = useState({ front: '', back: '' });
   const [aiOpen, setAiOpen] = useState(false);
@@ -22,8 +23,17 @@ export default function StudySet() {
   const saveTimer = useRef(null);
 
   useEffect(() => {
-    api(`/sets/${id}`).then(setSet).catch((e) => toast(e.message, 'error'));
-  }, [id]);
+    let cancelled = false;
+    setLoadError('');
+    api(`/sets/${id}`)
+      .then((data) => { if (!cancelled) setSet(data); })
+      .catch((e) => {
+        if (cancelled) return;
+        setLoadError(e.message || 'Failed to load this set');
+        toast(e.message, 'error');
+      });
+    return () => { cancelled = true; };
+  }, [id, toast]);
 
   const handleContentChange = useCallback((html) => {
     clearTimeout(saveTimer.current);
@@ -66,6 +76,7 @@ export default function StudySet() {
     }
   };
   const share = async () => {
+    if (!set?.shareId) return;
     const url = `${location.origin}/share/${set.shareId}`;
     try {
       await navigator.clipboard.writeText(url);
@@ -73,7 +84,27 @@ export default function StudySet() {
     } catch { prompt('Copy this link:', url); }
   };
 
-  if (!set) return null;
+  if (loadError) {
+    return (
+      <div className="space-y-4 p-6">
+        <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4">
+          <p className="font-medium text-destructive">Couldn't load this set</p>
+          <p className="mt-1 text-sm text-muted-foreground">{loadError}</p>
+        </div>
+        <Link to="/notes" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="h-4 w-4" />Back to notes
+        </Link>
+      </div>
+    );
+  }
+
+  if (!set) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -103,15 +134,14 @@ export default function StudySet() {
 
       <div className="grid lg:grid-cols-[1fr_380px] gap-6">
         <Card>
-          <CardHeader className="pb-2">
+          <CardContent className="pt-6">
             <CollabEditor
               setId={id}
               initialContent={set.content}
               onContentChange={handleContentChange}
               extraToolbar={<span aria-live="polite">{saving}</span>}
             />
-          </CardHeader>
-          <CardContent className="pt-0" />
+          </CardContent>
         </Card>
 
         <div className="space-y-4">
