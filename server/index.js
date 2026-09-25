@@ -59,6 +59,7 @@ app.use((err, _req, res, _next) => {
   res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
 });
 
+// Last-resort handlers — keep the process alive if a third-party library // throws an uncaught async error (like infinite-campus does on district lookup failure). process.on('uncaughtException', (err) => {   console.error('[uncaughtException]', err?.message || err); }); process.on('unhandledRejection', (err) => {   console.error('[unhandledRejection]', err?.message || err); });
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
 setupSockets(io);
