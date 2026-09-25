@@ -21,7 +21,7 @@ const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 async function callAI({ systemPrompt, userPrompt, jsonMode = false, maxTokens = 4000 }) {
   const body = {
     model: process.env.GROQ_MODEL || 'openai/gpt-oss-120b',
-    temperature: 0.3,
+    temperature: 0.45,
     max_tokens: maxTokens,
     messages: [
       { role: 'system', content: systemPrompt },
@@ -134,18 +134,42 @@ Proclamation of 1763
 <p><strong>Proclamation of 1763:</strong> Issued by Britain in 1763 after the Seven Years' War, this law prohibited colonial settlement west of the Appalachian Mountains. It was meant to prevent costly conflicts with Native Americans, but colonists saw it as an infringement on their rights and largely ignored it — fueling early resentment toward British authority.</p>
 <p><strong>George Washington:</strong> Virginia planter and militia officer who commanded colonial forces during the French and Indian War, including the defeat at Fort Necessity in 1754. His military experience and reputation later made him the obvious choice to lead the Continental Army.</p>
 
-Only use these tags: p, strong, em, u, mark.`
-}
+Only use these tags: p, strong, em, u, mark.`;
 
+const STOPWORDS = new Set([
+  'The', 'This', 'That', 'These', 'Those', 'They', 'Their', 'There',
+  'Which', 'When', 'Where', 'What', 'While', 'With', 'From', 'Into',
+  'Upon', 'After', 'Before', 'During', 'Under', 'Over', 'About',
+  'Also', 'Both', 'Each', 'Many', 'Most', 'Some', 'Such', 'More',
+  'American', 'United', 'States', 'Government', 'People', 'Nation',
+  'History', 'Period', 'Time', 'Year', 'Years', 'Century', 'Section',
+  'Chapter', 'Page', 'Part', 'Study', 'Notes', 'Review', 'Answer',
+]);
+
+function extractTerms(text) {
+  const terms = new Set();
+
+  // Priority: pull anything already bolded, italicized, underlined, or highlighted
+  for (const tag of ['strong', 'em', 'u', 'mark']) {
+    const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'gi');
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      const inner = m[1].replace(/<[^>]+>/g, '').trim();
+      if (inner && inner.length > 2 && inner.length < 80) terms.add(inner);
+    }
+  }
+
+  // Capitalized multi-word phrases (names, acts, events, places)
   const plain = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
   const phrases = plain.match(/\b[A-Z][a-zA-Z]+(?:\s+(?:[A-Z][a-zA-Z]+|[&']\s*[A-Z][a-zA-Z]+)){0,3}\b/g) || [];
   for (const p of phrases) {
     const clean = p.trim();
     if (clean.length < 4) continue;
-    if (stopwords.has(clean)) continue;
+    if (STOPWORDS.has(clean)) continue;
     terms.add(clean);
   }
 
+  // Years (1500s–1900s)
   for (const y of plain.match(/\b1[5-9]\d{2}\b/g) || []) terms.add(y);
 
   return [...terms].slice(0, 30);
@@ -192,103 +216,4 @@ async function generateNotes(sourceContent) {
         return { title, html, source: 'ai' };
       }
     } catch (e) {
-      console.warn('Groq notes generation failed, falling back:', e.message);
-    }
-  }
-  const plain = sourceContent.replace(/<[^>]+>/g, ' ');
-  return { ...heuristicNotes(plain), source: 'heuristic' };
-}
-
-function heuristicNotes(text) {
-  const plain = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-  const sentences = plain.split(/(?<=[.!?])\s+/).slice(0, 60);
-  const paragraphs = [];
-  for (let i = 0; i < sentences.length; i += 4) {
-    const chunk = sentences.slice(i, i + 4).join(' ');
-    if (chunk) paragraphs.push(`<p>${chunk}</p>`);
-  }
-  const title = (plain.split(/[.!?]/)[0] || 'Notes').slice(0, 60).trim();
-  return { title, html: `<h2>Summary</h2>${paragraphs.join('')}` };
-}
-
-function heuristicCards(text, max = 12) {
-  const cards = [];
-  const plain = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-  for (const line of text.replace(/<[^>]+>/g, '\n').split(/\n+/)) {
-    const m = line.match(/^\s*([^:\-–]{2,60})\s*[:\-–]\s*(.{5,})$/);
-    if (m) cards.push({ front: `What is ${m[1].trim()}?`, back: m[2].trim() });
-  }
-  for (const sentence of plain.split(/(?<=[.!?])\s+/)) {
-    if (cards.length >= max) break;
-    const m = sentence.match(/^(?:The\s+)?([A-Z][\w\s-]{2,50}?)\s+(is|are|means|refers to)\s+(.{8,})$/i);
-    if (m) cards.push({ front: `What ${m[2].toLowerCase()} ${m[1].trim()}?`, back: sentence.trim() });
-  }
-  const seen = new Set();
-  return cards.filter((c) => !seen.has(c.front) && seen.add(c.front)).slice(0, max);
-}
-
-/* ---------- Flashcards ---------- */
-
-router.post('/flashcards', validate(z.object({ text: z.string().trim().min(20, 'Paste at least a few sentences'), max: z.coerce.number().int().min(1).max(30).default(12) })), wrap(async (req, res) => {
-  const { text, max } = req.body;
-  let cards = [];
-  let source = 'heuristic';
-
-  if (process.env.GROQ_API_KEY) {
-    try {
-      const content = await callAI({
-        systemPrompt: `You are a study assistant. Summarize the student's notes into up to ${max} high-quality flashcards. Respond ONLY with JSON: {"cards":[{"front":"question","back":"concise answer"}]}. Questions should test understanding, not trivia. Keep answers under 40 words.`,
-        userPrompt: text.slice(0, 12000),
-        jsonMode: true,
-        maxTokens: 3000,
-      });
-      const parsed = JSON.parse(content);
-      cards = (parsed.cards || []).filter((c) => c.front && c.back).slice(0, max);
-      source = 'ai';
-    } catch (e) {
-      console.warn('Groq flashcard generation failed, falling back:', e.message);
-    }
-  }
-
-  if (!cards.length) cards = heuristicCards(text, max);
-  if (!cards.length) return res.status(422).json({ error: 'Could not extract flashcards. Try "Term: definition" lines or fuller sentences.' });
-  res.json({ cards, source });
-}));
-
-/* ---------- Notes (pasted text) ---------- */
-
-router.post('/notes', validate(z.object({ text: z.string().trim().min(50, 'Paste at least a paragraph of source text') })), wrap(async (req, res) => {
-  const normalized = normalizeHtml(req.body.text);
-  res.json(await generateNotes(normalized));
-}));
-
-/* ---------- Notes (uploaded file) ---------- */
-
-router.post('/notes/upload', upload.single('file'), wrap(async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-
-  const name = (req.file.originalname || '').toLowerCase();
-  let content = '';
-
-  try {
-    if (name.endsWith('.docx')) {
-      const result = await mammoth.convertToHtml({ buffer: req.file.buffer });
-      content = normalizeHtml(result.value);
-    } else if (name.endsWith('.pdf')) {
-      content = await extractPdfHtml(req.file.buffer);
-    } else {
-      content = await parseOfficeAsync(req.file.buffer);
-    }
-  } catch (e) {
-    return res.status(422).json({ error: `Could not read that file (${e.message}). Try .docx, .pptx, .pdf, or .txt.` });
-  }
-
-  content = (content || '').trim();
-  if (content.replace(/<[^>]+>/g, '').trim().length < 50) {
-    return res.status(422).json({ error: 'That file has too little text to work with.' });
-  }
-
-  res.json(await generateNotes(content));
-}));
-
-export default router;
+      console.warn('Gro*
