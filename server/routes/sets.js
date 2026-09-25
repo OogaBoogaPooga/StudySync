@@ -75,5 +75,5 @@ shareRoutes.get('/:shareId', wrap(async (req, res) => {
     include: { cards: true, user: { select: { name: true } } },
   });
   if (!set) return res.status(404).json({ error: 'This shared set does not exist' });
-  res.json({ title: set.title, content: set.content, cards: set.cards, author: set.user.name });
+  res.json({ id: set.id, title: set.title, content: set.content, cards: set.cards, author: set.user.name });
 }));
