@@ -38,7 +38,7 @@ export default function App() {
           <Route path="/calendar" element={<CalendarPage />} />
           <Route path="/focus" element={<Focus />} />
           <Route path="/notes" element={<Notes />} />
-          <Route path="/notes/:id" element={<StudySet />} />
+          <Route path="/notes/:id" element={<StudySet />} />           <Route path="/quiz/:id" element={<Quiz />} />
           <Route path="/grades" element={<Grades />} />
           <Route path="/rooms" element={<Rooms />} />
           <Route path="/rooms/:code" element={<Room />} />
