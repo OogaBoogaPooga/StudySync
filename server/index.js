@@ -12,7 +12,8 @@ import assignmentRoutes from './routes/assignments.js';
 import sessionRoutes from './routes/sessions.js';
 import { setRoutes, shareRoutes } from './routes/sets.js';
 import aiRoutes from './routes/ai.js';
-import quizzesRoutes from './routes/quizzes.js';
+import quizzesRoutes from './routes/quizzes.js'; 
+import shareEditRoutes from './routes/shareEdit.js';
 import { setupSockets } from './socket.js';
 
 if (!process.env.JWT_SECRET) {
@@ -34,7 +35,8 @@ app.use('/api/classes', classRoutes);
 app.use('/api/assignments', assignmentRoutes);
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/sets', setRoutes);
-app.use('/api/share', shareRoutes);
+app.use('/api/share', shareRoutes); 
+app.use('/api/share', shareEditRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/quizzes', quizzesRoutes);
 
