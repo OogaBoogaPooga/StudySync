@@ -111,31 +111,31 @@ function extractPdfHtml(buffer) {
   });
 }
 
-const NOTES_SYSTEM_PROMPT = `You turn source material into a student's personal study notes. Not a study guide, not a summary. Notes the way a student writes them in class.
+const NOTES_SYSTEM_PROMPT = `You turn source material into detailed APUSH study notes written in the voice of a sharp, well-prepared student — clear and precise, but not stiff or robotic. Not a textbook. Not a text message. The kind of notes you'd actually use to write an LEQ or DBQ.
 
 FORMAT — every entry looks exactly like this, one per paragraph:
-<p><strong>Term:</strong> casual explanation, 1-3 sentences.</p>
+<p><strong>Term:</strong> explanation covering what it is, when/where it happened, who was involved, and why it mattered historically. 2–4 sentences.</p>
 
 RULES:
-1. Pull out every named event, war, treaty, battle, person, place, concept, policy, and year from the source. Each one gets its own entry.
+1. Pull out every named event, war, treaty, battle, person, place, act, policy, movement, court case, and year from the source. Each one gets its own entry.
 2. Do not skip anyone or anything. If a person is named (George Washington, Benjamin Franklin, King George III, Chief Pontiac), they get their own entry.
 3. Never split a term across punctuation. "Proclamation of 1763" is ONE term, written as <strong>Proclamation of 1763:</strong>. Never write "Proclamation of:" then "1763:" separately. Never put a period or comma right before the colon.
 4. Never invent facts or years. Only use what's in the source.
 5. Preserve every date, name, number, and citation marker like [1] or [2] exactly as written.
 6. If the source has <strong>, <em>, <u>, or <mark> tags, every term inside those tags MUST get its own entry.
-7. Write casually. "Basically," "this is when," "in other words" are fine. Match the source's voice.
-8. No Key Terms section. No Key Takeaways section. No Cause and Effect section. Everything is inline.
+7. Tone: write like a student who genuinely understands the material. Full sentences. Proper historical terms. You can say "this led to" or "the key thing here is" — but avoid filler phrases like "basically" or "in other words." No fluff, no hedging.
+8. For every entry, include: what it is + when/context + why it mattered (cause, effect, or historical significance for APUSH themes like continuity & change, causation, or power & politics).
+9. No Key Terms section. No Key Takeaways. No Cause and Effect section. No headers of any kind. Everything is inline paragraphs only.
 
-OUTPUT FORMAT — this is critical: Respond with the HTML content ONLY. No JSON. No markdown. No backticks. No preamble like "Here are your notes:". No explanation. Start your response immediately with the first tag.  On the very first line, output the title as a plain text line ending with a newline, then start the HTML on the next line. Example:  Seven Years' War <p><strong>Seven Years' War:</strong> the 1754-1763 conflict between Britain and France.</p> <p><strong>George Washington:</strong> led the Virginia militia and surrendered at Fort Necessity.</p>  Only use these tags: h2, h3, p, ul, ol, li, strong, em, u, mark.`
+OUTPUT FORMAT — critical: Respond with HTML content ONLY. No JSON. No markdown. No backticks. No preamble like "Here are your notes:". Start immediately with content.
+On the very first line, output the title as a plain text line ending with a newline, then start the HTML on the next line. Example:
 
-function extractTerms(text) {
-  const terms = new Set();
-  const stopwords = new Set(['The','And','This','That','They','These','Those','However','Nevertheless','Therefore','Because','When','While','After','Before','Importantly','Ultimately','First','Second','Third','Lastly','By','In','On','At','To','Of','For','With','From','As','If','It','Its','But','Or','So','Yet','Also','Both','Each','Every','Some','Many','Most','Such','Then','Than','Here','There','Where','What','Which','Who','Whom','Whose','Why','How']);
+Proclamation of 1763
+<p><strong>Proclamation of 1763:</strong> Issued by Britain in 1763 after the Seven Years' War, this law prohibited colonial settlement west of the Appalachian Mountains. It was meant to prevent costly conflicts with Native Americans, but colonists saw it as an infringement on their rights and largely ignored it — fueling early resentment toward British authority.</p>
+<p><strong>George Washington:</strong> Virginia planter and militia officer who commanded colonial forces during the French and Indian War, including the defeat at Fort Necessity in 1754. His military experience and reputation later made him the obvious choice to lead the Continental Army.</p>
 
-  for (const tag of text.match(/<(strong|em|u|mark)>([^<]+)<\/\1>/g) || []) {
-    const inner = tag.replace(/<[^>]+>/g, '').trim();
-    if (inner) terms.add(inner);
-  }
+Only use these tags: p, strong, em, u, mark.`
+}
 
   const plain = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
   const phrases = plain.match(/\b[A-Z][a-zA-Z]+(?:\s+(?:[A-Z][a-zA-Z]+|[&']\s*[A-Z][a-zA-Z]+)){0,3}\b/g) || [];
