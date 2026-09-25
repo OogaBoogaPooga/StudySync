@@ -78,7 +78,6 @@ function EditorInner({ provider, initialContent, onContentChange, extraToolbar, 
     onUpdate: ({ editor }) => { onContentChange?.(editor.getHTML()); },
   }, [provider]);
 
-  // Seed Yjs doc if we're the designated first client and it's empty
   useEffect(() => {
     if (!editor || !provider) return;
     if (!provider.shouldSeed()) return;
@@ -89,7 +88,6 @@ function EditorInner({ provider, initialContent, onContentChange, extraToolbar, 
     provider.markSeeded();
   }, [editor, provider, initialContent]);
 
-  // Track collaborators from awareness
   useEffect(() => {
     if (!provider) return;
     const update = () => {
@@ -114,8 +112,9 @@ function EditorInner({ provider, initialContent, onContentChange, extraToolbar, 
   );
 }
 
-export default function CollabEditor({ setId, initialContent, onContentChange, extraToolbar }) {
-  const { user } = useApp();
+export default function CollabEditor({ setId, initialContent, onContentChange, extraToolbar, user: userProp }) {
+  const { user: authUser } = useApp();
+  const user = userProp || authUser;
   const [provider, setProvider] = useState(null);
 
   useEffect(() => {
@@ -123,7 +122,7 @@ export default function CollabEditor({ setId, initialContent, onContentChange, e
     const p = createCollabProvider(setId, user);
     setProvider(p);
     return () => { p.destroy(); setProvider(null); };
-  }, [setId, user?.id]);
+  }, [setId, user?.id, user?.name]);
 
   if (!provider) return <div className="min-h-[360px] animate-pulse rounded-md border bg-muted/30" />;
   return <EditorInner provider={provider} initialContent={initialContent} onContentChange={onContentChange} extraToolbar={extraToolbar} user={user} />;
