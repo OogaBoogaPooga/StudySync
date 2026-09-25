@@ -2,8 +2,9 @@ import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useApp } from './lib/store.jsx';
 import Layout from './components/Layout.jsx';
+import { MusicProvider } from './lib/music.jsx';
+import MusicPill from './components/MusicPill.jsx';
 
-// Route-level code splitting keeps the initial bundle small
 const Login = lazy(() => import('./pages/Login.jsx'));
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const CalendarPage = lazy(() => import('./pages/CalendarPage.jsx'));
@@ -13,7 +14,8 @@ const StudySet = lazy(() => import('./pages/StudySet.jsx'));
 const SharedSet = lazy(() => import('./pages/SharedSet.jsx'));
 const Grades = lazy(() => import('./pages/Grades.jsx'));
 const Rooms = lazy(() => import('./pages/Rooms.jsx'));
-const Room = lazy(() => import('./pages/Room.jsx')); const Quiz = lazy(() => import('./pages/Quiz.jsx'));
+const Room = lazy(() => import('./pages/Room.jsx'));
+const Quiz = lazy(() => import('./pages/Quiz.jsx'));
 
 const Spinner = () => (
   <div className="flex h-[60vh] items-center justify-center" role="status" aria-label="Loading">
@@ -29,22 +31,26 @@ function Protected({ children }) {
 
 export default function App() {
   return (
-    <Suspense fallback={<Spinner />}>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/share/:shareId" element={<SharedSet />} />
-        <Route element={<Protected><Layout /></Protected>}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/calendar" element={<CalendarPage />} />
-          <Route path="/focus" element={<Focus />} />
-          <Route path="/notes" element={<Notes />} />
-          <Route path="/notes/:id" element={<StudySet />} />           <Route path="/quiz/:id" element={<Quiz />} />
-          <Route path="/grades" element={<Grades />} />
-          <Route path="/rooms" element={<Rooms />} />
-          <Route path="/rooms/:code" element={<Room />} />
-        </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Suspense>
+    <MusicProvider>
+      <Suspense fallback={<Spinner />}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/share/:shareId" element={<SharedSet />} />
+          <Route element={<Protected><Layout /></Protected>}>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/calendar" element={<CalendarPage />} />
+            <Route path="/focus" element={<Focus />} />
+            <Route path="/notes" element={<Notes />} />
+            <Route path="/notes/:id" element={<StudySet />} />
+            <Route path="/quiz/:id" element={<Quiz />} />
+            <Route path="/grades" element={<Grades />} />
+            <Route path="/rooms" element={<Rooms />} />
+            <Route path="/rooms/:code" element={<Room />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+        <MusicPill />
+      </Suspense>
+    </MusicProvider>
   );
 }
