@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { LayoutDashboard, CalendarDays, Timer, BookOpen, GraduationCap, Users, Moon, Sun, Contrast, LogOut, Sparkles } from 'lucide-react';
 import { useApp } from '@/lib/store.jsx';
+import NotesChat from './NotesChat.jsx';
 import { Button } from './ui/button.jsx';
 import { cn } from '@/lib/utils';
 
@@ -64,7 +65,9 @@ export default function Layout() {
             <Icon className="h-5 w-5" aria-hidden />{label}
           </NavLink>
         ))}
-      </nav>
+            </nav>
+
+      <NotesChat />
     </div>
   );
 }
