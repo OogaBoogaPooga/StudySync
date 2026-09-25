@@ -1,8 +1,5 @@
 /**
- * Tiny fetch wrapper with:
- *  - automatic JWT header
- *  - readable error messages
- *  - localStorage fallback: GET responses are cached, and served if the backend is unreachable
+ * Tiny fetch wrapper with JWT header + offline cache.
  */
 export const TOKEN_KEY = 'studysync_token';
 
@@ -32,7 +29,6 @@ export async function api(path, { method = 'GET', body } = {}) {
     if (method === 'GET') localStorage.setItem(cacheKey, JSON.stringify(data));
     return data;
   } catch (err) {
-    // Network failure (server down) → serve cached copy for GETs
     if (method === 'GET' && err instanceof TypeError) {
       const cached = localStorage.getItem(cacheKey);
       if (cached) {
@@ -61,13 +57,13 @@ export const getQuizAttemptsBySet = (setId) => api(`/quizzes/by-set/${setId}`);
 
 // ---- Infinite Campus ----
 export const getICStatus = () => api('/ic/status');
-
-export const saveICCredentials = (district, state, username, password) =>
-  api('/ic/credentials', { method: 'POST', body: { district, state, username, password } });
-
+export const saveICCredentials = (portalUrl, username, password) =>
+  api('/ic/credentials', { method: 'POST', body: { portalUrl, username, password } });
 export const disconnectIC = () => api('/ic/credentials', { method: 'DELETE' });
-
+export const previewICSync = () => api('/ic/preview', { method: 'POST' });
 export const syncICGrades = () => api('/ic/sync', { method: 'POST' });
+export const syncICGradesSelected = (selection) =>
+  api('/ic/sync', { method: 'POST', body: { selection } });
 
 // ---- Grade snapshots ----
 export const updateClass = (id, body) =>
