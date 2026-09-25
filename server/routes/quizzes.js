@@ -6,6 +6,8 @@ import { requireAuth, validate, wrap } from '../middleware/auth.js';
 const router = Router();
 router.use(requireAuth);
 
+const NL = String.fromCharCode(10);
+
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 async function callAI({ systemPrompt, userPrompt, jsonMode = false, maxTokens = 4000 }) {
@@ -24,13 +26,13 @@ async function callAI({ systemPrompt, userPrompt, jsonMode = false, maxTokens = 
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      Authorization: 'Bearer ' + process.env.GROQ_API_KEY,
     },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
     const detail = await res.text().catch(() => '');
-    throw new Error(`Groq error (${res.status}): ${detail.slice(0, 300)}`);
+    throw new Error('Groq error (' + res.status + '): ' + detail.slice(0, 300));
   }
   const data = await res.json();
   return data.choices[0].message.content;
@@ -42,7 +44,6 @@ const generateSchema = z.object({
   types: z.array(z.enum(['mcq', 'short'])).min(1).default(['mcq', 'short']),
 });
 
-// POST /api/quizzes/generate
 router.post('/generate', validate(generateSchema), wrap(async (req, res) => {
   const { setId, count, types } = req.body;
 
@@ -55,8 +56,8 @@ router.post('/generate', validate(generateSchema), wrap(async (req, res) => {
   if (!process.env.GROQ_API_KEY) return res.status(400).json({ error: 'AI is not configured' });
 
   const cardText = set.cards
-    .map((c, i) => `${i + 1}. Front: ${c.front}\n   Back: ${c.back}`)
-    .join('\n');
+    .map((c, i) => (i + 1) + '. Front: ' + c.front + NL + '   Back: ' + c.back)
+    .join(NL);
 
   const typeInstruction = types.length === 2
     ? 'Mix multiple-choice and short-answer questions, roughly 50/50.'
@@ -64,28 +65,28 @@ router.post('/generate', validate(generateSchema), wrap(async (req, res) => {
       ? 'All questions must be multiple-choice.'
       : 'All questions must be short-answer.';
 
-  const systemPrompt = `You write practice quizzes for students based on their flashcards. Return ONLY valid JSON matching this exact shape:
-{
-  "questions": [
-    {
-      "type": "mcq" | "short",
-      "question": "string",
-      "options": ["a","b","c","d"],
-      "answer": "string",
-      "explanation": "string"
-    }
-  ]
-}
-Rules:
-- Generate exactly ${count} questions.
-- ${typeInstruction}
-- For "mcq", provide exactly 4 options and set "answer" to the full text of the correct option.
-- For "short", omit "options" and set "answer" to a short model answer (1 sentence).
-- Only test knowledge present in the provided cards.
-- Do not number the questions inside the "question" field.
-- Keep questions clear and test-like.`;
+  const systemPrompt = 'You write practice quizzes for students based on their flashcards. Return ONLY valid JSON matching this exact shape:' + NL +
+    '{' + NL +
+    '  "questions": [' + NL +
+    '    {' + NL +
+    '      "type": "mcq" | "short",' + NL +
+    '      "question": "string",' + NL +
+    '      "options": ["a","b","c","d"],' + NL +
+    '      "answer": "string",' + NL +
+    '      "explanation": "string"' + NL +
+    '    }' + NL +
+    '  ]' + NL +
+    '}' + NL +
+    'Rules:' + NL +
+    '- Generate exactly ' + count + ' questions.' + NL +
+    '- ' + typeInstruction + NL +
+    '- For "mcq", provide exactly 4 options and set "answer" to the full text of the correct option.' + NL +
+    '- For "short", omit "options" and set "answer" to a short model answer (1 sentence).' + NL +
+    '- Only test knowledge present in the provided cards.' + NL +
+    '- Do not number the questions inside the "question" field.' + NL +
+    '- Keep questions clear and test-like.';
 
-  const userPrompt = `Study set: "${set.title}"\n\nCards:\n${cardText}`;
+  const userPrompt = 'Study set: "' + set.title + '"' + NL + NL + 'Cards:' + NL + cardText;
 
   const raw = await callAI({ systemPrompt, userPrompt, jsonMode: true, maxTokens: 4000 });
 
@@ -106,8 +107,6 @@ Rules:
   res.json({ quiz: { id: quiz.id, setId, createdAt: quiz.createdAt } });
 }));
 
-// GET /api/quizzes/by-set/:setId — attempt history
-// NOTE: must be declared before /:id so "by-set" isn't treated as an id
 router.get('/by-set/:setId', wrap(async (req, res) => {
   const attempts = await prisma.quizAttempt.findMany({
     where: { userId: req.user.id, quiz: { setId: req.params.setId } },
@@ -121,7 +120,6 @@ router.get('/by-set/:setId', wrap(async (req, res) => {
   });
 }));
 
-// GET /api/quizzes/:id
 router.get('/:id', wrap(async (req, res) => {
   const quiz = await prisma.quiz.findFirst({
     where: { id: req.params.id, userId: req.user.id },
@@ -137,7 +135,6 @@ router.get('/:id', wrap(async (req, res) => {
   });
 }));
 
-// POST /api/quizzes/:id/submit
 const submitSchema = z.object({
   answers: z.array(z.object({
     type: z.enum(['mcq', 'short']),
