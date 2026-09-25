@@ -40,7 +40,7 @@ function Toolbar({ editor, collaborators, extra }) {
 
       <span className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
         {collaborators.length > 1 && (
-          <span className="flex items-center gap-1.5" title={collaborators.map(c => c.name).join(', ')}>
+          <span className="flex items-center gap-1.5" title={collaborators.map((c) => c.name).join(', ')}>
             <span className="flex -space-x-1.5">
               {collaborators.slice(0, 5).map((c) => (
                 <span key={c.clientId} className="h-4 w-4 rounded-full ring-2 ring-card" style={{ backgroundColor: c.color }} />
@@ -58,36 +58,45 @@ function Toolbar({ editor, collaborators, extra }) {
 function EditorInner({ provider, initialContent, onContentChange, extraToolbar, user }) {
   const [collaborators, setCollaborators] = useState([]);
 
-  const editor = useEditor({
-    extensions: [
-      StarterKit.configure({ history: false, heading: { levels: [2, 3] } }),
-      Underline,
-      Link.configure({ openOnClick: false, autolink: true, HTMLAttributes: { rel: 'noopener noreferrer' } }),
-      Placeholder.configure({ placeholder: 'Start typing your notes…' }),
-      Collaboration.configure({ document: provider.doc, field: 'default' }),
-      CollaborationCursor.configure({
-        provider: provider.provider,
-        user: { name: user?.name || 'Someone', color: colorForUser(user) },
-      }),
-    ],
-    editorProps: {
-      attributes: {
-        class: 'prose-editor min-h-[360px] rounded-md border bg-background p-4 text-sm outline-none focus:ring-2 focus:ring-ring',
+  const editor = useEditor(
+    {
+      extensions: [
+        StarterKit.configure({ history: false, heading: { levels: [2, 3] } }),
+        Underline,
+        Link.configure({ openOnClick: false, autolink: true, HTMLAttributes: { rel: 'noopener noreferrer' } }),
+        Placeholder.configure({ placeholder: 'Start typing your notes…' }),
+        Collaboration.configure({ document: provider.doc, field: 'default' }),
+        CollaborationCursor.configure({
+          provider: provider.provider,
+          user: { name: user?.name || 'Someone', color: colorForUser(user) },
+        }),
+      ],
+      editorProps: {
+        attributes: {
+          class: 'prose-editor min-h-[360px] rounded-md border bg-background p-4 text-sm outline-none focus:ring-2 focus:ring-ring',
+        },
+      },
+      onUpdate: ({ editor }) => {
+        onContentChange?.(editor.getHTML());
       },
     },
-    onUpdate: ({ editor }) => { onContentChange?.(editor.getHTML()); },
-  }, [provider]);
+    [provider]
+  );
 
+  /* Seed from initialContent if we're the designated first client and doc is empty */
   useEffect(() => {
     if (!editor || !provider) return;
-    if (!provider.shouldSeed()) return;
-    const xml = provider.doc.getXmlFragment('default');
-    if (xml.length === 0 && initialContent) {
-      editor.commands.setContent(initialContent);
-    }
-    provider.markSeeded();
+    provider.onReady(() => {
+      if (!provider.isSeeder()) return;
+      // First client in a fresh room. Push the DB content into Yjs if there is any.
+      if (initialContent && editor.isEmpty) {
+        editor.commands.setContent(initialContent);
+      }
+      provider.markSeeded();
+    });
   }, [editor, provider, initialContent]);
 
+  /* Track awareness for the collaborator roster */
   useEffect(() => {
     if (!provider) return;
     const update = () => {
@@ -97,12 +106,14 @@ function EditorInner({ provider, initialContent, onContentChange, extraToolbar, 
       });
       setCollaborators(list);
     };
-    provider.awareness.on('change', update);
+    provider.awareness.on('update', update);
     update();
-    return () => provider.awareness.off('change', update);
+    return () => provider.awareness.off('update', update);
   }, [provider]);
 
-  if (!editor) return <div className="min-h-[360px] animate-pulse rounded-md border bg-muted/30" />;
+  if (!editor) {
+    return <div className="min-h-[360px] animate-pulse rounded-md border bg-muted/30" />;
+  }
 
   return (
     <div className="space-y-2">
@@ -121,9 +132,22 @@ export default function CollabEditor({ setId, initialContent, onContentChange, e
     if (!setId) return;
     const p = createCollabProvider(setId, user);
     setProvider(p);
-    return () => { p.destroy(); setProvider(null); };
+    return () => {
+      p.destroy();
+      setProvider(null);
+    };
   }, [setId, user?.id, user?.name]);
 
-  if (!provider) return <div className="min-h-[360px] animate-pulse rounded-md border bg-muted/30" />;
-  return <EditorInner provider={provider} initialContent={initialContent} onContentChange={onContentChange} extraToolbar={extraToolbar} user={user} />;
+  if (!provider) {
+    return <div className="min-h-[360px] animate-pulse rounded-md border bg-muted/30" />;
+  }
+  return (
+    <EditorInner
+      provider={provider}
+      initialContent={initialContent}
+      onContentChange={onContentChange}
+      extraToolbar={extraToolbar}
+      user={user}
+    />
+  );
 }
