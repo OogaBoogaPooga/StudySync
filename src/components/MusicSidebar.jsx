@@ -5,6 +5,20 @@ import { TRACKS, MOODS } from '@/lib/musicCatalog.js';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card.jsx';
 import { cn } from '@/lib/utils';
 
+const GLASS_CARD =
+  'overflow-hidden rounded-xl ' +
+  'border border-white/25 dark:border-amber-200/15 ' +
+  'bg-gradient-to-br from-white/30 via-white/15 to-amber-100/20 ' +
+  'dark:from-slate-900/40 dark:via-slate-900/25 dark:to-amber-950/20 ' +
+  'backdrop-blur-3xl backdrop-saturate-200 ' +
+  'shadow-[0_20px_60px_-15px_rgba(217,119,6,0.25),0_8px_24px_-8px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.5)] ' +
+  'dark:shadow-[0_20px_60px_-15px_rgba(217,119,6,0.15),0_8px_24px_-8px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.12)]';
+
+const AMBER_BTN =
+  'bg-gradient-to-br from-amber-400 to-yellow-500 text-slate-900 ' +
+  'shadow-[0_4px_14px_-2px_rgba(245,158,11,0.5),inset_0_1px_0_rgba(255,255,255,0.4)] ' +
+  'hover:from-amber-300 hover:to-yellow-400';
+
 export default function MusicSidebar() {
   const m = useMusic();
   const [search, setSearch] = useState('');
@@ -20,7 +34,7 @@ export default function MusicSidebar() {
   });
 
   return (
-    <Card className="overflow-hidden border-white/20 bg-white/40 backdrop-blur-2xl backdrop-saturate-150 dark:border-white/10 dark:bg-slate-900/50">
+    <Card className={GLASS_CARD}>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">Study music</CardTitle>
@@ -39,7 +53,7 @@ export default function MusicSidebar() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search tracks…"
-            className="w-full rounded-full border border-white/20 bg-white/40 pl-8 pr-3 py-1.5 text-xs outline-none placeholder:text-foreground/40 focus:border-primary/40 dark:border-white/10 dark:bg-black/20"
+            className="w-full rounded-full border border-white/30 bg-white/30 pl-8 pr-3 py-1.5 text-xs outline-none placeholder:text-foreground/40 focus:border-amber-400/50 focus:ring-2 focus:ring-amber-400/20 dark:border-white/10 dark:bg-black/20 backdrop-blur-sm"
             aria-label="Search tracks"
           />
         </div>
@@ -50,10 +64,10 @@ export default function MusicSidebar() {
               key={mo}
               onClick={() => setMood(mo)}
               className={cn(
-                'rounded-full border px-2 py-0.5 text-[10px]',
+                'rounded-full border px-2 py-0.5 text-[10px] transition-all',
                 mood === mo
-                  ? 'border-primary/50 bg-primary/15 text-primary'
-                  : 'border-white/20 bg-white/30 text-foreground/70 hover:bg-white/50 dark:border-white/10 dark:bg-white/5'
+                  ? 'border-amber-400/50 bg-gradient-to-br from-amber-400/25 to-yellow-500/20 text-amber-700 dark:text-amber-200'
+                  : 'border-white/30 bg-white/20 text-foreground/70 hover:bg-white/40 dark:border-white/10 dark:bg-white/5'
               )}
             >
               {mo}
@@ -73,7 +87,9 @@ export default function MusicSidebar() {
                 onClick={() => m.selectTrack(t.id)}
                 className={cn(
                   'flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left text-xs transition-colors',
-                  isCurrent ? 'bg-primary/15 text-primary' : 'hover:bg-white/40 dark:hover:bg-white/5'
+                  isCurrent
+                    ? 'bg-gradient-to-r from-amber-400/25 to-yellow-500/15 text-amber-700 dark:text-amber-200'
+                    : 'hover:bg-white/40 dark:hover:bg-white/5'
                 )}
               >
                 <span className="grid h-6 w-6 place-items-center">
@@ -86,12 +102,12 @@ export default function MusicSidebar() {
           })}
         </div>
 
-        <div className="flex items-center justify-center gap-2 border-t border-white/15 pt-2 dark:border-white/10">
+        <div className="flex items-center justify-center gap-2 border-t border-white/20 pt-2 dark:border-white/10">
           <button
             onClick={m.toggleShuffle}
             className={cn(
-              'grid h-8 w-8 place-items-center rounded-full',
-              m.shuffle ? 'bg-primary/15 text-primary' : 'text-foreground/60 hover:bg-white/40 dark:hover:bg-white/10'
+              'grid h-8 w-8 place-items-center rounded-full transition-colors',
+              m.shuffle ? 'bg-amber-400/15 text-amber-600 dark:text-amber-300' : 'text-foreground/60 hover:bg-white/40 dark:hover:bg-white/10'
             )}
             aria-label="Shuffle"
           >
@@ -99,7 +115,10 @@ export default function MusicSidebar() {
           </button>
           <button
             onClick={m.toggle}
-            className="grid h-11 w-11 place-items-center rounded-full bg-primary text-primary-foreground shadow-md"
+            className={cn(
+              'grid h-11 w-11 place-items-center rounded-full transition-transform hover:scale-[1.04] active:scale-95',
+              AMBER_BTN
+            )}
             aria-label={m.playing ? 'Pause' : 'Play'}
           >
             {m.playing ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5 ml-0.5" />}
@@ -107,8 +126,8 @@ export default function MusicSidebar() {
           <button
             onClick={m.cycleLoop}
             className={cn(
-              'grid h-8 w-8 place-items-center rounded-full',
-              m.loopMode !== 'none' ? 'bg-primary/15 text-primary' : 'text-foreground/60 hover:bg-white/40 dark:hover:bg-white/10'
+              'grid h-8 w-8 place-items-center rounded-full transition-colors',
+              m.loopMode !== 'none' ? 'bg-amber-400/15 text-amber-600 dark:text-amber-300' : 'text-foreground/60 hover:bg-white/40 dark:hover:bg-white/10'
             )}
             aria-label={`Loop: ${m.loopMode}`}
           >
