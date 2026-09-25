@@ -141,7 +141,7 @@ The source text may contain <strong>, <em>, <u>, or <mark> tags. These represent
 - Count the emphasized terms in the source. Count the bolded entries in your output. The numbers must match.
 
 VOICE:
-- Write casually, like a student explaining to a classmate. "Basically," "this is when," "in other words," "think of it as" are all fine.
+- Write laid, back and professional, like a advanced student explaining to a classmate. "Basically," "this is when," "in other words," "think of it as" are all fine.
 - Keep the student's shorthand. If they wrote "more then just," keep it.
 - Short parenthetical asides for context are welcome. Example: "(people start going to church again)".
 - Do NOT clean up the source's grammar to sound formal. Match the source's voice.
@@ -150,7 +150,7 @@ VOICE:
 PRESERVE FROM SOURCE:
 - Keep citation markers like [1], [2], [3] exactly where they appeared.
 - Keep every date, name, treaty, court case, and number.
-- Do not invent facts. Only use what's in the source.
+
 
 DO NOT:
 - Do NOT add a "Key Terms" section at the end.
@@ -161,11 +161,43 @@ DO NOT:
 
 Respond ONLY with JSON: {"title":"short descriptive title","html":"<h2>Topic</h2><p><strong>Term:</strong> explanation</p>"}. Use only these HTML tags: h2, h3, p, ul, ol, li, strong, em, u, mark. Do not include a top-level h1.`
 
+/** Pulls out proper nouns, dates, and tagged terms as a mandatory checklist */
+function extractTerms(text) {
+  const terms = new Set();
+  const stopwords = new Set(['The','And','This','That','They','These','Those','However','Nevertheless','Therefore','Because','When','While','After','Before','Importantly','Ultimately','First','Second','Third','Lastly','By','In','On','At','To','Of','For','With','From','As','If','It','Its','But','Or','So','Yet','Also','Both','Each','Every','Some','Many','Most','Such','Then','Than','Here','There','Where','What','Which','Who','Whom','Whose','Why','How']);
+
+  // Anything wrapped in formatting tags
+  for (const tag of text.match(/<(strong|em|u|mark)>([^<]+)<\/\1>/g) || []) {
+    const inner = tag.replace(/<[^>]+>/g, '').trim();
+    if (inner) terms.add(inner);
+  }
+
+  // Proper-noun phrases (1-4 capitalized words in a row)
+  const plain = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+  const phrases = plain.match(/\b[A-Z][a-zA-Z]+(?:\s+(?:[A-Z][a-zA-Z]+|[&']\s*[A-Z][a-zA-Z]+)){0,3}\b/g) || [];
+  for (const p of phrases) {
+    const clean = p.trim();
+    if (clean.length < 4) continue;
+    if (stopwords.has(clean)) continue;
+    terms.add(clean);
+  }
+
+  // Years
+  for (const y of plain.match(/\b1[5-9]\d{2}\b/g) || []) terms.add(y);
+
+  return [...terms].slice(0, 80);
+}
+
 async function generateNotes(sourceContent) {
+  const terms = extractTerms(sourceContent);
+  const checklist = terms.length
+    ? `\n\nMANDATORY TERMS — your output MUST contain a separate <strong>Term:</strong> entry for EVERY item in this list. Do not merge them. Do not mention them inside other entries. Each one gets its own paragraph.\n\n${terms.map((t) => `- ${t}`).join('\n')}\n\nIf any item is missing from your output, the response is wrong. Count them and verify.`
+    : '';
+
   if (process.env.GROQ_API_KEY) {
     try {
       const content = await callAI({
-        systemPrompt: NOTES_SYSTEM_PROMPT,
+        systemPrompt: NOTES_SYSTEM_PROMPT + checklist,
         userPrompt: sourceContent.slice(0, 24000),
         jsonMode: true,
       });
@@ -175,21 +207,8 @@ async function generateNotes(sourceContent) {
       console.warn('Groq notes generation failed, falling back:', e.message);
     }
   }
-  // Fallback: strip tags, then run the heuristic
   const plain = sourceContent.replace(/<[^>]+>/g, ' ');
   return { ...heuristicNotes(plain), source: 'heuristic' };
-}
-
-function heuristicNotes(text) {
-  const plain = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-  const sentences = plain.split(/(?<=[.!?])\s+/).slice(0, 60);
-  const paragraphs = [];
-  for (let i = 0; i < sentences.length; i += 4) {
-    const chunk = sentences.slice(i, i + 4).join(' ');
-    if (chunk) paragraphs.push(`<p>${chunk}</p>`);
-  }
-  const title = (plain.split(/[.!?]/)[0] || 'Notes').slice(0, 60).trim();
-  return { title, html: `<h2>Summary</h2>${paragraphs.join('')}` };
 }
 
 /* ---------- Flashcards ---------- */
