@@ -39,7 +39,8 @@ app.use('/api/sets', setRoutes);
 app.use('/api/share', shareRoutes);
 app.use('/api/share', shareEditRoutes);
 app.use('/api/ai', aiRoutes);
-app.use('/api/quizzes', quizzesRoutes);
+app.use('/api/quizzes', quizzesRoutes); 
+app.use('/api/ic', infiniteCampusRoutes);
 
 // Public-domain study music from the /data volume
 app.use('/api/music', express.static('/data/music', { maxAge: '7d', immutable: true }));
