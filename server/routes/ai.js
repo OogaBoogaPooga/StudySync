@@ -421,14 +421,16 @@ router.post('/chat', validate(z.object({
     });
   }
 
-  const top = rankCards(message, cards);
-  const passages = top.length
-    ? top.map((c, i) => '[' + (i + 1) + '] ' + c.front + ' - ' + c.back + ' (from "' + c.setTitle + '")').join(NL)
-    : '(No strongly matching cards found.)';
+   const top = rankCards(message, cards);
+  const used = top.length ? top : cards.slice(0, 12);
+  const passages = used
+    .map((c, i) => '[' + (i + 1) + '] ' + c.front + ' - ' + c.back + ' (from "' + c.setTitle + '")')
+    .join(NL);
 
   const systemPrompt = 'You are StudySync\'s study assistant. Answer the user\'s question using ONLY the information in the passages below, drawn from ' + scopeLabel + '.' + NL +
     'Rules:' + NL +
-    '- If the answer is not present in the passages, reply exactly: "I couldn\'t find that in your notes."' + NL +
+    '- If the user asks a factual question (e.g. "what was X", "when did Y happen") and the passages do not contain the answer, reply exactly: "I couldn\'t find that in your notes."' + NL +
+    '- If the user asks a meta-question about their study material (e.g. "what should I study", "summarize this set", "quiz me"), you may recommend specific terms from the passages.' + NL +
     '- Be concise: 1-3 short paragraphs max.' + NL +
     '- When you use a passage, cite it inline like [1], [2].' + NL +
     '- Do not invent facts. Do not use outside knowledge.';
@@ -453,10 +455,9 @@ router.post('/chat', validate(z.object({
     ],
   });
 
-  res.json({
+    res.json({
     reply,
-    sources: top.map((c) => ({ front: c.front, back: c.back, setTitle: c.setTitle })),
+    sources: used.map((c) => ({ front: c.front, back: c.back, setTitle: c.setTitle })),
   });
-}));
 
 export default router;
