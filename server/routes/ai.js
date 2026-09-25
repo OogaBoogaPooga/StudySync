@@ -159,13 +159,38 @@ async function generateNotes(sourceContent) {
 
   if (process.env.GROQ_API_KEY) {
     try {
-      const content = await callAI({
+      const raw = await callAI({
         systemPrompt: NOTES_SYSTEM_PROMPT + checklist,
         userPrompt: sourceContent.slice(0, 20000),
         maxTokens: 8000,
       });
-      const parsed = JSON.parse(content);
-      if (parsed.html) return { title: parsed.title || 'AI notes', html: parsed.html, source: 'ai' };
+
+      let text = (raw || '').trim();
+      text = text.replace(/^```(?:html|json)?\s*/i, '').replace(/```\s*$/i, '').trim();
+
+      let title = 'AI notes';
+      let html = text;
+
+      if (text.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(text);
+          if (parsed.html) { title = parsed.title || 'AI notes'; html = parsed.html; }
+        } catch {}
+      } else {
+        const newlineIndex = text.indexOf('\n');
+        if (newlineIndex > 0 && newlineIndex < 200) {
+          const firstLine = text.slice(0, newlineIndex).trim();
+          const rest = text.slice(newlineIndex + 1).trim();
+          if (firstLine && !firstLine.includes('<') && firstLine.length < 120 && rest.includes('<')) {
+            title = firstLine.replace(/^["']|["']$/g, '');
+            html = rest;
+          }
+        }
+      }
+
+      if (html && html.includes('<')) {
+        return { title, html, source: 'ai' };
+      }
     } catch (e) {
       console.warn('Groq notes generation failed, falling back:', e.message);
     }
