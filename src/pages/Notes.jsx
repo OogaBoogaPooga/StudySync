@@ -1,174 +1,240 @@
 import { useEffect, useRef, useState } from 'react';
-import { MessageSquare, X, Send, Sparkles } from 'lucide-react';
-import { api, chatWithNotes } from '@/lib/api.js';
+import { Link, useNavigate } from 'react-router-dom';
+import { BookOpen, Plus, Sparkles, Upload, Trash2, Loader2, ArrowRight } from 'lucide-react';
+import { format } from 'date-fns';
+import { api } from '@/lib/api.js';
+import { useApp } from '@/lib/store.jsx';
+import { Button } from '@/components/ui/button.jsx';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card.jsx';
+import { Input, Textarea } from '@/components/ui/input.jsx';
+import { Dialog, DialogContent } from '@/components/ui/dialog.jsx';
 
-const SUGGESTIONS = [
-  'What should I study?',
-  'Summarize this set',
-  'Quiz me on the key terms',
-];
+export default function Notes() {
+  const { toast } = useApp();
+  const navigate = useNavigate();
+  const [sets, setSets] = useState(null);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [newOpen, setNewOpen] = useState(false);
 
-export default function NotesChat() {
-  const [open, setOpen] = useState(false);
-  const [sets, setSets] = useState([]);
-  const [setId, setSetId] = useState('');
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
-  const [busy, setBusy] = useState(false);
-  const scrollRef = useRef(null);
-
-  useEffect(() => {
-    if (!open || sets.length) return;
+  const load = () =>
     api('/sets')
-      .then((data) => setSets(Array.isArray(data) ? data : data.sets || []))
-      .catch(() => {});
-  }, [open, sets.length]);
+      .then((d) => setSets(Array.isArray(d) ? d : []))
+      .catch((e) => { toast(e.message, 'error'); setSets([]); });
 
-  useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages, open, busy]);
+  useEffect(() => { load(); }, []);
 
-  async function sendText(raw) {
-    const text = raw.trim();
-    if (!text || busy) return;
-    setInput('');
-    setMessages((m) => [...m, { role: 'user', content: text }]);
-    setBusy(true);
+  const cardCount = (s) => s._count?.cards ?? s.cards?.length ?? 0;
+
+  const removeSet = async (s) => {
+    if (!confirm(`Delete "${s.title}"? This cannot be undone.`)) return;
     try {
-      const res = await chatWithNotes(text, setId || null);
-      setMessages((m) => [...m, { role: 'assistant', content: res.reply }]);
-    } catch (err) {
-      setMessages((m) => [...m, { role: 'assistant', content: 'Something went wrong. Try again in a moment.' }]);
-    } finally {
-      setBusy(false);
-    }
+      await api(`/sets/${s.id}`, { method: 'DELETE' });
+      setSets((list) => list.filter((x) => x.id !== s.id));
+      toast('Set deleted');
+    } catch (e) { toast(e.message, 'error'); }
+  };
+
+  const createBlank = async (title) => {
+    try {
+      const created = await api('/sets', { method: 'POST', body: { title, content: '' } });
+      navigate(`/notes/${created.id}`);
+    } catch (e) { toast(e.message, 'error'); }
+  };
+
+  const createFromAI = async (result) => {
+    try {
+      const created = await api('/sets', {
+        method: 'POST',
+        body: { title: result.title || 'AI notes', content: result.html || '' },
+      });
+      toast('Notes created');
+      navigate(`/notes/${created.id}`);
+    } catch (e) { toast(e.message, 'error'); }
+  };
+
+  if (sets === null) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
   }
 
-  const send = () => sendText(input);
-
   return (
-    <>
-      {!open && (
-        <button
-          onClick={() => setOpen(true)}
-          className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-50 flex items-center gap-2 rounded-full border border-primary/20 bg-card px-4 py-3 text-sm font-medium text-foreground shadow-xl transition-all hover:shadow-2xl hover:-translate-y-0.5"
-          aria-label="Open notes chat"
-        >
-          <span className="grid h-6 w-6 place-items-center rounded-full bg-primary/10">
-            <MessageSquare className="h-3.5 w-3.5 text-primary" />
-          </span>
-          <span className="hidden sm:inline">Ask my notes</span>
-        </button>
-      )}
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h1 className="text-2xl font-bold">Notes</h1>
+          <p className="text-sm text-muted-foreground">
+            {sets.length} study {sets.length === 1 ? 'set' : 'sets'}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setAiOpen(true)}>
+            <Sparkles className="h-4 w-4 text-violet-500" />AI notes
+          </Button>
+          <Button variant="gradient" onClick={() => setNewOpen(true)}>
+            <Plus className="h-4 w-4" />New set
+          </Button>
+        </div>
+      </div>
 
-      {open && (
-        <div className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-50 flex h-[600px] max-h-[calc(100vh-6rem)] w-[400px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-2xl animate-fade-in">
-          <div className="flex items-center justify-between border-b border-border/60 bg-card/80 px-4 py-3 backdrop-blur">
-            <div className="flex items-center gap-2.5">
-              <span className="grid h-7 w-7 place-items-center rounded-full bg-primary/10">
-                <Sparkles className="h-3.5 w-3.5 text-primary" />
-              </span>
-              <div className="leading-tight">
-                <div className="text-sm font-semibold tracking-tight">Ask my notes</div>
-                <div className="text-[11px] text-muted-foreground">Grounded in your study sets</div>
-              </div>
+      {sets.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-primary/10">
+              <BookOpen className="h-6 w-6 text-primary" />
             </div>
-            <button
-              onClick={() => setOpen(false)}
-              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              aria-label="Close chat"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-
-          <div className="border-b border-border/60 px-3 py-2">
-            <select
-              value={setId}
-              onChange={(e) => setSetId(e.target.value)}
-              className="w-full rounded-lg border border-border/60 bg-background px-3 py-1.5 text-xs font-medium text-foreground/90 outline-none transition-colors focus:border-primary/40 focus:ring-2 focus:ring-primary/10"
-              aria-label="Choose study set"
-            >
-              <option value="">All my sets</option>
-              {sets.map((s) => (
-                <option key={s.id} value={s.id}>{s.title}</option>
-              ))}
-            </select>
-          </div>
-
-          <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-4">
-            {messages.length === 0 && !busy && (
-              <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-                <span className="mb-3 grid h-10 w-10 place-items-center rounded-full bg-primary/10">
-                  <Sparkles className="h-5 w-5 text-primary" />
-                </span>
-                <p className="text-sm font-medium">Ask anything in your notes.</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  I'll answer using only your study sets, with citations.
-                </p>
-                <div className="mt-5 flex flex-col gap-1.5 w-full">
-                  {SUGGESTIONS.map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => sendText(s)}
-                      className="rounded-full border border-border/60 bg-background px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-foreground"
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-3">
-              {messages.map((m, i) => (
-                <div key={i} className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
-                  <div
-                    className={
-                      m.role === 'user'
-                        ? 'max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-primary px-3.5 py-2 text-sm leading-relaxed text-primary-foreground shadow-sm'
-                        : 'max-w-[90%] whitespace-pre-wrap rounded-2xl rounded-bl-md border border-border/60 bg-background px-3.5 py-2 text-sm leading-relaxed text-foreground'
-                    }
+            <p className="font-medium">No study sets yet</p>
+            <p className="mb-4 text-sm text-muted-foreground">
+              Create your first set, or generate notes from a PDF, DOCX, or pasted text.
+            </p>
+            <div className="flex justify-center gap-2">
+              <Button variant="outline" onClick={() => setAiOpen(true)}>
+                <Sparkles className="h-4 w-4 text-violet-500" />AI notes
+              </Button>
+              <Button variant="gradient" onClick={() => setNewOpen(true)}>
+                <Plus className="h-4 w-4" />New set
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {sets.map((s) => (
+            <Card key={s.id} className="group transition-all hover:shadow-md">
+              <CardHeader className="pb-2">
+                <div className="flex items-start justify-between gap-2">
+                  <CardTitle className="text-base leading-tight">
+                    <Link to={`/notes/${s.id}`} className="hover:underline">{s.title}</Link>
+                  </CardTitle>
+                  <button
+                    onClick={() => removeSet(s)}
+                    className="rounded-md p-1 opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100 hover:bg-destructive/10"
+                    aria-label="Delete set"
                   >
-                    {m.content}
-                  </div>
+                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                  </button>
                 </div>
-              ))}
-
-              {busy && (
-                <div className="flex justify-start">
-                  <div className="flex items-center gap-1 rounded-2xl rounded-bl-md border border-border/60 bg-background px-3.5 py-3">
-                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.3s]" />
-                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.15s]" />
-                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/60" />
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="border-t border-border/60 bg-card/80 px-3 py-2.5 backdrop-blur">
-            <div className="flex items-center gap-2 rounded-full border border-border/60 bg-background pl-3.5 pr-1 py-1 transition-all focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10">
-              <input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && send()}
-                placeholder="Ask a question…"
-                className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                aria-label="Chat input"
-              />
-              <button
-                onClick={send}
-                disabled={busy || !input.trim()}
-                className="grid h-8 w-8 place-items-center rounded-full bg-primary text-primary-foreground transition-all hover:opacity-90 disabled:opacity-30"
-                aria-label="Send"
-              >
-                <Send className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          </div>
+                <CardDescription className="text-xs">
+                  {cardCount(s)} card{cardCount(s) === 1 ? '' : 's'}
+                  {s.updatedAt && ` · ${format(new Date(s.updatedAt), 'MMM d')}`}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-2">
+                <Link
+                  to={`/notes/${s.id}`}
+                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                >
+                  Open <ArrowRight className="h-3 w-3" />
+                </Link>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
-    </>
+
+      <NewSetDialog open={newOpen} onClose={() => setNewOpen(false)} onCreate={createBlank} />
+      <AINotesDialog open={aiOpen} onClose={() => setAiOpen(false)} onCreated={createFromAI} />
+    </div>
+  );
+}
+
+function NewSetDialog({ open, onClose, onCreate }) {
+  const [title, setTitle] = useState('');
+  useEffect(() => { if (open) setTitle(''); }, [open]);
+  const submit = () => { if (title.trim()) { onCreate(title.trim()); onClose(); } };
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent title="New study set" description="Give your notes a title. You can rename it later.">
+        <div className="space-y-3">
+          <Input
+            autoFocus
+            placeholder="e.g. APUSH Chapter 5"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && submit()}
+            aria-label="Set title"
+          />
+          <Button onClick={submit} disabled={!title.trim()} variant="gradient" className="w-full">Create</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function AINotesDialog({ open, onClose, onCreated }) {
+  const { toast } = useApp();
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef(null);
+
+  useEffect(() => { if (open) setText(''); }, [open]);
+
+  const generateFromText = async () => {
+    setBusy(true);
+    try {
+      const result = await api('/ai/notes', { method: 'POST', body: { text } });
+      await onCreated(result);
+      onClose();
+    } catch (e) { toast(e.message, 'error'); }
+    finally { setBusy(false); }
+  };
+
+  const uploadFile = async (file) => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const token = localStorage.getItem('studysync_token');
+      const res = await fetch('/api/ai/notes/upload', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: fd,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Upload failed (${res.status})`);
+      await onCreated(data);
+      onClose();
+    } catch (e) { toast(e.message, 'error'); }
+    finally { setUploading(false); if (fileRef.current) fileRef.current.value = ''; }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent title="AI notes" description="Paste source text or upload a .docx, .pdf, .pptx, or .txt file.">
+        <div className="space-y-3">
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".docx,.pdf,.pptx,.txt"
+            className="hidden"
+            onChange={(e) => uploadFile(e.target.files?.[0])}
+          />
+          <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={uploading} className="w-full">
+            {uploading ? <><Loader2 className="h-4 w-4 animate-spin" />Reading file…</> : <><Upload className="h-4 w-4" />Upload file</>}
+          </Button>
+          <div className="relative text-center">
+            <span className="relative z-10 bg-card px-2 text-xs text-muted-foreground">or paste text</span>
+            <div className="absolute inset-x-0 top-1/2 h-px bg-border" />
+          </div>
+          <Textarea
+            rows={6}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Paste lecture notes, textbook passages, etc."
+            aria-label="Source text"
+          />
+          <Button onClick={generateFromText} disabled={busy || text.trim().length < 50} variant="gradient" className="w-full">
+            {busy ? <><Loader2 className="h-4 w-4 animate-spin" />Generating…</> : <><Sparkles className="h-4 w-4" />Generate notes</>}
+          </Button>
+          <p className="text-[11px] text-muted-foreground">
+            Generates 1–2 sentence entries per term in APUSH-style format.
+          </p>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
