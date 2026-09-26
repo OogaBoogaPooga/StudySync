@@ -1,9 +1,10 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, CalendarDays, Timer, BookOpen, GraduationCap, Users, Moon, Sun, Contrast, LogOut, Music2, VolumeX } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Timer, BookOpen, GraduationCap, Users, Moon, Sun, Contrast, LogOut, Music2, VolumeX, HelpCircle } from 'lucide-react';
 import { useApp } from '@/lib/store.jsx';
 import { useMusic } from '@/lib/music.jsx';
 import NotesChat from './NotesChat.jsx';
 import Logo from './Logo.jsx';
+import Tour from './Tour.jsx';
 import { Button } from './ui/button.jsx';
 import { cn } from '@/lib/utils';
 
@@ -27,6 +28,20 @@ function MusicToggleButton() {
       title={m.enabled ? 'Turn music off' : 'Turn music on'}
     >
       {m.enabled ? <Music2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+    </Button>
+  );
+}
+
+function HelpButton() {
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={() => window.dispatchEvent(new CustomEvent('studysync:startTour'))}
+      aria-label="Take a tour"
+      title="Take a tour"
+    >
+      <HelpCircle className="h-4 w-4" />
     </Button>
   );
 }
@@ -56,6 +71,7 @@ export default function Layout() {
             <MusicToggleButton />
             <Button variant="ghost" size="icon" onClick={toggleDark} aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'} title="Toggle dark mode">{isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</Button>
             <Button variant="ghost" size="icon" onClick={toggleContrast} aria-pressed={contrast} aria-label="Toggle high contrast" title="High contrast"><Contrast className="h-4 w-4" /></Button>
+            <HelpButton />
             <Button variant="ghost" size="icon" onClick={logout} aria-label="Log out" title="Log out" className="ml-auto"><LogOut className="h-4 w-4" /></Button>
           </div>
         </div>
@@ -66,6 +82,7 @@ export default function Layout() {
         <div className="flex gap-1">
           <MusicToggleButton />
           <Button variant="ghost" size="icon" onClick={toggleDark} aria-label="Toggle dark mode">{isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</Button>
+          <HelpButton />
           <Button variant="ghost" size="icon" onClick={logout} aria-label="Log out"><LogOut className="h-4 w-4" /></Button>
         </div>
       </header>
@@ -83,6 +100,7 @@ export default function Layout() {
       </nav>
 
       <NotesChat />
+      <Tour />
     </div>
   );
 }
