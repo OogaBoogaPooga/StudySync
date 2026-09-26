@@ -67,8 +67,7 @@ export const syncICGradesSelected = (selection) =>
 
 // ---- Grade snapshots ----
 export const updateClass = (id, body) =>
-  api(`/classes/${id}`, { method: 'PATCH', body });
-
+  api(`/classes/${id}`, { method: 'PUT', body });
 // ---- Screenshot grade import ----
 export async function scanGradesFromScreenshot(file) {
   const fd = new FormData();
