@@ -29,7 +29,7 @@ function MusicToggleButton() {
       aria-label={m.enabled ? 'Turn music off' : 'Turn music on'}
       title={m.enabled ? 'Turn music off' : 'Turn music on'}
     >
-      {m.enabled ? <Music2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+      {m.enabled ? <Music2 className="h-[18px] w-[18px]" /> : <VolumeX className="h-[18px] w-[18px]" />}
     </Button>
   );
 }
@@ -39,30 +39,50 @@ export default function Layout() {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const link = ({ isActive }) =>
-    cn('flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors', isActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground');
+    cn(
+      'flex items-center gap-3 rounded-lg px-3.5 py-2.5 text-[15px] font-medium transition-colors',
+      isActive
+        ? 'bg-primary/10 text-primary'
+        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+    );
 
   return (
     <div className="min-h-screen md:flex">
       <a href="#main" className="skip-link">Skip to content</a>
 
-      <aside className="hidden md:flex md:w-60 md:flex-col border-r bg-card/60 backdrop-blur sticky top-0 h-screen no-print">
-        <div className="px-5 py-5">
+      <aside className="hidden md:flex md:w-64 md:flex-col border-r bg-card/60 backdrop-blur sticky top-0 h-screen no-print">
+        <div className="px-5 py-6">
           <Logo />
         </div>
         <nav aria-label="Main" className="flex-1 space-y-1 px-3">
           {NAV.map(({ to, label, icon: Icon }) => (
-            <NavLink key={to} to={to} end={to === '/'} className={link}><Icon className="h-4 w-4" aria-hidden />{label}</NavLink>
+            <NavLink key={to} to={to} end={to === '/'} className={link}>
+              <Icon className="h-5 w-5" aria-hidden />
+              {label}
+            </NavLink>
           ))}
         </nav>
-        <div className="border-t p-3 space-y-2">
-          <div className="px-2 text-xs text-muted-foreground truncate">Signed in as <span className="font-medium text-foreground">{user?.name}</span></div>
+        <div className="border-t p-3 space-y-2.5">
+          <div className="px-2 text-[13px] text-muted-foreground truncate">
+            Signed in as <span className="font-medium text-foreground">{user?.name}</span>
+          </div>
           <div className="flex gap-1">
             <MusicToggleButton />
-            <Button variant="ghost" size="icon" onClick={toggleDark} aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'} title="Toggle dark mode">{isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</Button>
-            <Button variant="ghost" size="icon" onClick={toggleContrast} aria-pressed={contrast} aria-label="Toggle high contrast" title="High contrast"><Contrast className="h-4 w-4" /></Button>
-            <Button variant="ghost" size="icon" onClick={() => window.dispatchEvent(new CustomEvent('studysync:startTour'))} aria-label="Take a tour" title="Take a tour"><HelpCircle className="h-4 w-4" /></Button>
-            <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)} aria-label="Settings" title="Settings"><Settings className="h-4 w-4" /></Button>
-            <Button variant="ghost" size="icon" onClick={logout} aria-label="Log out" title="Log out" className="ml-auto"><LogOut className="h-4 w-4" /></Button>
+            <Button variant="ghost" size="icon" onClick={toggleDark} aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'} title="Toggle dark mode">
+              {isDark ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
+            </Button>
+            <Button variant="ghost" size="icon" onClick={toggleContrast} aria-pressed={contrast} aria-label="Toggle high contrast" title="High contrast">
+              <Contrast className="h-[18px] w-[18px]" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => window.dispatchEvent(new CustomEvent('studysync:startTour'))} aria-label="Take a tour" title="Take a tour">
+              <HelpCircle className="h-[18px] w-[18px]" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)} aria-label="Settings" title="Settings">
+              <Settings className="h-[18px] w-[18px]" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={logout} aria-label="Log out" title="Log out" className="ml-auto">
+              <LogOut className="h-[18px] w-[18px]" />
+            </Button>
           </div>
         </div>
       </aside>
@@ -71,10 +91,18 @@ export default function Layout() {
         <Logo size="sm" />
         <div className="flex gap-1">
           <MusicToggleButton />
-          <Button variant="ghost" size="icon" onClick={toggleDark} aria-label="Toggle dark mode">{isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</Button>
-          <Button variant="ghost" size="icon" onClick={() => window.dispatchEvent(new CustomEvent('studysync:startTour'))} aria-label="Take a tour"><HelpCircle className="h-4 w-4" /></Button>
-          <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)} aria-label="Settings"><Settings className="h-4 w-4" /></Button>
-          <Button variant="ghost" size="icon" onClick={logout} aria-label="Log out"><LogOut className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" onClick={toggleDark} aria-label="Toggle dark mode">
+            {isDark ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => window.dispatchEvent(new CustomEvent('studysync:startTour'))} aria-label="Take a tour">
+            <HelpCircle className="h-[18px] w-[18px]" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)} aria-label="Settings">
+            <Settings className="h-[18px] w-[18px]" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={logout} aria-label="Log out">
+            <LogOut className="h-[18px] w-[18px]" />
+          </Button>
         </div>
       </header>
 
@@ -85,7 +113,8 @@ export default function Layout() {
       <nav aria-label="Main mobile" className="md:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-6 border-t glass no-print">
         {NAV.map(({ to, label, icon: Icon }) => (
           <NavLink key={to} to={to} end={to === '/'} className={({ isActive }) => cn('flex flex-col items-center gap-0.5 py-2 text-[10px]', isActive ? 'text-primary' : 'text-muted-foreground')}>
-            <Icon className="h-5 w-5" aria-hidden />{label}
+            <Icon className="h-5 w-5" aria-hidden />
+            {label}
           </NavLink>
         ))}
       </nav>
