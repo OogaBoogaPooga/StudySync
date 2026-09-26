@@ -655,4 +655,3 @@ router.post('/grades/scan', upload.single('file'), wrap(async (req, res) => {
 }));
 
 export default router;
-export default router;
