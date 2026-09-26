@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
-import { Printer, Calculator, Cloud, CloudOff, RefreshCw, Pencil, Trash2, Loader2 } from 'lucide-react';
-import {
-  api, getICStatus, saveICCredentials, disconnectIC, previewICSync, syncICGradesSelected, updateClass,
-} from '@/lib/api.js';
+import { Printer, Calculator, Pencil, Trash2 } from 'lucide-react';
+import { api, updateClass } from '@/lib/api.js';
 import { useApp } from '@/lib/store.jsx';
 import { computeGPA, classStats } from '@/lib/grades.js';
 import { Button } from '@/components/ui/button.jsx';
@@ -20,17 +18,12 @@ export default function Grades() {
   const [assignments, setAssignments] = useState([]);
   const [whatIf, setWhatIf] = useState({ classId: '', score: 90, maxScore: 100, weight: 1 });
   const [snapshotFor, setSnapshotFor] = useState(null);
-  const [icOpen, setIcOpen] = useState(false);
-  const [ic, setIc] = useState({ connected: false, lastSync: null, portalUrl: null, username: null });
-  const [syncing, setSyncing] = useState(false);
-  const [previewData, setPreviewData] = useState(null);
 
   const loadAll = () =>
-    Promise.all([api('/classes'), api('/assignments'), getICStatus().catch(() => ({ connected: false }))])
-      .then(([c, a, s]) => {
+    Promise.all([api('/classes'), api('/assignments')])
+      .then(([c, a]) => {
         setClasses(c);
         setAssignments(a);
-        setIc(s || { connected: false });
         setWhatIf((w) => ({ ...w, classId: w.classId || c[0]?.id || '' }));
       })
       .catch((e) => toast(e.message, 'error'));
@@ -123,56 +116,19 @@ export default function Grades() {
     } catch (e) { toast(e.message, 'error'); }
   };
 
-  const runICSync = async () => {
-    setSyncing(true);
-    try {
-      const preview = await previewICSync();
-      setPreviewData(preview);
-    } catch (e) {
-      toast(e.message, 'error');
-    } finally { setSyncing(false); }
-  };
-
-  const applyPreview = async (selection) => {
-    setSyncing(true);
-    try {
-      const r = await syncICGradesSelected(selection);
-      const c = r.created?.length || 0;
-      const u = r.updated?.length || 0;
-      toast(`Imported ${c} new · updated ${u}`);
-      setPreviewData(null);
-      await loadAll();
-    } catch (e) {
-      toast(e.message, 'error');
-    } finally { setSyncing(false); }
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-2xl font-bold">Grades & GPA</h1>
-          <p className="text-sm text-muted-foreground">Track grades manually or sync them from Infinite Campus.</p>
+          <p className="text-sm text-muted-foreground">
+            Click the pencil next to any class to enter a current grade from your school portal.
+          </p>
         </div>
-        <div className="flex gap-2 no-print">
-          <Button variant="outline" onClick={() => setIcOpen(true)}>
-            {ic.connected ? <><Cloud className="h-4 w-4 text-emerald-500" />Infinite Campus</> : <><CloudOff className="h-4 w-4" />Connect IC</>}
-          </Button>
-          <Button variant="outline" onClick={() => window.print()}><Printer className="h-4 w-4" />Export PDF</Button>
-        </div>
+        <Button variant="outline" onClick={() => window.print()} className="no-print">
+          <Printer className="h-4 w-4" />Export PDF
+        </Button>
       </div>
-
-      {ic.connected && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card/60 px-4 py-2 text-sm">
-          <span className="text-muted-foreground">
-            Infinite Campus: <span className="font-medium text-foreground">{ic.username}</span>
-            {ic.lastSync && <> · last sync {new Date(ic.lastSync).toLocaleString()}</>}
-          </span>
-          <Button variant="outline" size="sm" onClick={runICSync} disabled={syncing}>
-            {syncing ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Syncing…</> : <><RefreshCw className="h-3.5 w-3.5" />Sync now</>}
-          </Button>
-        </div>
-      )}
 
       <div className="grid md:grid-cols-3 gap-4">
         <Card className="md:col-span-1 bg-gradient-to-br from-slate-700 to-slate-600 text-white border-0 shadow-lg">
@@ -215,8 +171,11 @@ export default function Grades() {
                         <span className="h-3 w-3 rounded-full" style={{ background: cls.color }} />
                         {cls.name}
                         {hasSnapshot && (
-                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary" title={cls.snapshotUpdatedAt ? `Updated ${new Date(cls.snapshotUpdatedAt).toLocaleDateString()}` : ''}>
-                            {cls.snapshotSource === 'infinitecampus' ? 'IC' : 'Manual'}
+                          <span
+                            className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary"
+                            title={cls.snapshotUpdatedAt ? `Updated ${new Date(cls.snapshotUpdatedAt).toLocaleDateString()}` : ''}
+                          >
+                            Manual
                           </span>
                         )}
                       </td>
@@ -229,7 +188,7 @@ export default function Grades() {
                         <button
                           onClick={() => setSnapshotFor(cls)}
                           className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-                          aria-label={hasSnapshot ? 'Edit grade snapshot' : 'Add grade'}
+                          aria-label={hasSnapshot ? 'Edit grade' : 'Add grade'}
                           title={hasSnapshot ? 'Edit grade' : 'Add grade'}
                         >
                           <Pencil className="h-3.5 w-3.5" />
@@ -289,23 +248,11 @@ export default function Grades() {
         </div>
       </div>
 
-      <PreviewDialog
-        data={previewData}
-        onClose={() => setPreviewData(null)}
-        onApply={applyPreview}
-      />
       <SnapshotDialog
         cls={snapshotFor}
         onClose={() => setSnapshotFor(null)}
         onSave={saveSnapshot}
         onClear={clearSnapshot}
-      />
-      <ICDialog
-        open={icOpen}
-        onClose={() => setIcOpen(false)}
-        ic={ic}
-        onConnected={async () => { await loadAll(); }}
-        onDisconnected={async () => { await loadAll(); }}
       />
     </div>
   );
@@ -317,115 +264,6 @@ const Row = ({ label, before, after }) => (
     <span><span className="line-through opacity-60 mr-2">{before}</span><b className="text-primary">{after}</b></span>
   </div>
 );
-
-/* ---------- Preview dialog ---------- */
-
-function PreviewDialog({ data, onClose, onApply }) {
-  const [uncheckedCreates, setUncheckedCreates] = useState(new Set());
-  const [uncheckedUpdates, setUncheckedUpdates] = useState(new Set());
-
-  useEffect(() => {
-    setUncheckedCreates(new Set());
-    setUncheckedUpdates(new Set());
-  }, [data]);
-
-  if (!data) return null;
-
-  const toggle = (set, setFn, key) => {
-    const next = new Set(set);
-    if (next.has(key)) next.delete(key);
-    else next.add(key);
-    setFn(next);
-  };
-
-  const totalSelected =
-    (data.creates?.filter((c) => !uncheckedCreates.has(c.icName)).length || 0) +
-    (data.updates?.filter((u) => !uncheckedUpdates.has(u.icName)).length || 0);
-
-  const apply = () => {
-    onApply({
-      creates: (data.creates || []).filter((c) => !uncheckedCreates.has(c.icName)).map((c) => c.icName),
-      updates: (data.updates || []).filter((u) => !uncheckedUpdates.has(u.icName)).map((u) => u.icName),
-    });
-  };
-
-  return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent
-        title="Import from Infinite Campus"
-        description="Uncheck anything you don't want to import. Selected items will be added or updated in your classes."
-        className="max-w-2xl"
-      >
-        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
-          {data.creates?.length > 0 && (
-            <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                New classes ({data.creates.length})
-              </p>
-              <div className="space-y-1">
-                {data.creates.map((c) => (
-                  <label key={c.icName} className="flex cursor-pointer items-center gap-3 rounded-md border p-2.5 text-sm hover:bg-accent">
-                    <input
-                      type="checkbox"
-                      checked={!uncheckedCreates.has(c.icName)}
-                      onChange={() => toggle(uncheckedCreates, setUncheckedCreates, c.icName)}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-medium">{c.icName}</span>
-                      {c.term && <span className="block text-[10px] text-muted-foreground">{c.term}</span>}
-                    </span>
-                    <span className="shrink-0 font-medium">
-                      {c.pct.toFixed(1)}%{c.letter ? ` · ${c.letter}` : ''}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {data.updates?.length > 0 && (
-            <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Updates to existing classes ({data.updates.length})
-              </p>
-              <div className="space-y-1">
-                {data.updates.map((u) => (
-                  <label key={u.icName} className="flex cursor-pointer items-center gap-3 rounded-md border p-2.5 text-sm hover:bg-accent">
-                    <input
-                      type="checkbox"
-                      checked={!uncheckedUpdates.has(u.icName)}
-                      onChange={() => toggle(uncheckedUpdates, setUncheckedUpdates, u.icName)}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-medium">{u.currentName}</span>
-                      <span className="block truncate text-[10px] text-muted-foreground">
-                        matched IC "{u.icName}"{u.term ? ` · ${u.term}` : ''}
-                      </span>
-                    </span>
-                    <span className="shrink-0 font-medium">
-                      {u.pct.toFixed(1)}%{u.letter ? ` · ${u.letter}` : ''}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {(!data.creates?.length && !data.updates?.length) && (
-            <p className="py-4 text-center text-sm text-muted-foreground">Nothing to import.</p>
-          )}
-        </div>
-
-        <div className="flex justify-end gap-2 pt-2 border-t">
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button variant="gradient" onClick={apply} disabled={totalSelected === 0}>
-            Import {totalSelected} item{totalSelected === 1 ? '' : 's'}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 /* ---------- Snapshot dialog ---------- */
 
@@ -447,7 +285,6 @@ function parseGradeInput(raw) {
 }
 
 function SnapshotDialog({ cls, onClose, onSave, onClear }) {
-  const open = !!cls;
   const [value, setValue] = useState('');
   const [error, setError] = useState('');
 
@@ -461,13 +298,7 @@ function SnapshotDialog({ cls, onClose, onSave, onClear }) {
     }
   }, [cls]);
 
-  if (!cls) {
-    return (
-      <Dialog open={false} onOpenChange={() => {}}>
-        <DialogContent title="" description="" />
-      </Dialog>
-    );
-  }
+  if (!cls) return null;
 
   const parsed = parseGradeInput(value);
   const pct = parsed ? (parsed.score / parsed.max) * 100 : null;
@@ -479,10 +310,10 @@ function SnapshotDialog({ cls, onClose, onSave, onClear }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent
         title={`Grade for ${cls.name}`}
-        description="Enter a current grade from Infinite Campus or any grade portal. Example: 143.26/158"
+        description="Enter a current grade from your school's portal. Examples: 143.26/158 or 95.97%"
       >
         <div className="space-y-3">
           <div className="space-y-1">
@@ -505,194 +336,6 @@ function SnapshotDialog({ cls, onClose, onSave, onClear }) {
             {hasSnapshot && (
               <Button variant="ghost" onClick={() => onClear(cls.id)} className="text-destructive hover:bg-destructive/10">
                 <Trash2 className="h-4 w-4" />Clear
-              </Button>
-            )}
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-/* ---------- Infinite Campus dialog ---------- */
-
-function ICDialog({ open, onClose, ic, onConnected, onDisconnected }) {
-  const { toast } = useApp();
-  const [mode, setMode] = useState('url');
-  const [form, setForm] = useState({ portalUrl: '', district: '', state: '', username: '', password: '' });
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [warning, setWarning] = useState('');
-
-  useEffect(() => {
-    if (!open) return;
-    setError('');
-    setWarning('');
-    setMode('url');
-    setForm({
-      portalUrl: ic.portalUrl || '',
-      district: '',
-      state: '',
-      username: ic.username || '',
-      password: '',
-    });
-  }, [open, ic]);
-
-  const connect = async () => {
-    setError('');
-    setWarning('');
-    setBusy(true);
-    try {
-      const payload = mode === 'url'
-        ? { portalUrl: form.portalUrl, username: form.username, password: form.password }
-        : { district: form.district, state: form.state.toUpperCase(), username: form.username, password: form.password };
-
-      const res = await saveICCredentials(payload);
-      if (res && res.warning) {
-        setWarning(`Saved, but login check failed: ${res.warning}`);
-        toast('Saved — but couldn\'t verify login');
-      } else {
-        toast('Infinite Campus connected');
-      }
-      await onConnected();
-      if (!res?.warning) onClose();
-    } catch (e) {
-      setError(e.message);
-    } finally { setBusy(false); }
-  };
-
-  const disconnect = async () => {
-    if (!confirm('Disconnect Infinite Campus? Your credentials will be wiped.')) return;
-    setBusy(true);
-    try {
-      await disconnectIC();
-      toast('Disconnected');
-      await onDisconnected();
-      onClose();
-    } catch (e) { setError(e.message); }
-    finally { setBusy(false); }
-  };
-
-  const canSubmit = form.username && form.password && (
-    mode === 'url' ? !!form.portalUrl : (form.district && form.state.length === 2)
-  );
-
-  return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent
-        title="Connect Infinite Campus"
-        description={ic.connected
-          ? 'Already connected. Re-enter credentials to update, or disconnect.'
-          : 'Link your IC account to sync grades automatically.'}
-        className="max-w-lg"
-      >
-        <div className="space-y-4">
-          {!ic.connected && (
-            <>
-              <div className="flex gap-1 rounded-full bg-muted p-1 text-xs" role="tablist">
-                <button
-                  role="tab"
-                  aria-selected={mode === 'url'}
-                  onClick={() => setMode('url')}
-                  className={`flex-1 rounded-full px-3 py-1.5 font-medium transition ${mode === 'url' ? 'bg-card shadow' : 'text-muted-foreground'}`}
-                >
-                  Paste my URL
-                </button>
-                <button
-                  role="tab"
-                  aria-selected={mode === 'district'}
-                  onClick={() => setMode('district')}
-                  className={`flex-1 rounded-full px-3 py-1.5 font-medium transition ${mode === 'district' ? 'bg-card shadow' : 'text-muted-foreground'}`}
-                >
-                  Find my district
-                </button>
-              </div>
-
-              {mode === 'url' ? (
-                <div className="space-y-2">
-                  <div className="rounded-lg border bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
-                    <p className="font-medium text-foreground">How to find your URL (30 seconds):</p>
-                    <ol className="mt-1.5 list-decimal space-y-1 pl-4">
-                      <li>Open <span className="font-medium text-foreground">Infinite Campus</span> in another tab and log in</li>
-                      <li>Once you see your grades, <span className="font-medium text-foreground">click the address bar</span> at the top</li>
-                      <li>Copy the whole URL (<span className="font-mono">Ctrl/Cmd + C</span>)</li>
-                      <li>Paste it below</li>
-                    </ol>
-                  </div>
-                  <Label htmlFor="ic-url">Portal URL</Label>
-                  <Input
-                    id="ic-url"
-                    placeholder="https://yourschool.infinitecampus.org/campus/..."
-                    value={form.portalUrl}
-                    onChange={(e) => setForm({ ...form, portalUrl: e.target.value })}
-                    autoFocus
-                  />
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <p className="text-xs text-muted-foreground">
-                    Enter the district name you type into the IC login page. We'll try to find the portal automatically.
-                  </p>
-                  <div className="space-y-1">
-                    <Label htmlFor="ic-district">District name</Label>
-                    <Input
-                      id="ic-district"
-                      placeholder="e.g. Jamestown 1"
-                      value={form.district}
-                      onChange={(e) => setForm({ ...form, district: e.target.value })}
-                      autoFocus
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="ic-state">State (2 letters)</Label>
-                    <Input
-                      id="ic-state"
-                      placeholder="ND"
-                      maxLength={2}
-                      value={form.state}
-                      onChange={(e) => setForm({ ...form, state: e.target.value.toUpperCase() })}
-                    />
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-
-          <div className="space-y-1">
-            <Label htmlFor="ic-user">Infinite Campus username</Label>
-            <Input
-              id="ic-user"
-              autoComplete="off"
-              placeholder="Your IC username"
-              value={form.username}
-              onChange={(e) => setForm({ ...form, username: e.target.value })}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="ic-pass">Infinite Campus password</Label>
-            <Input
-              id="ic-pass"
-              type="password"
-              autoComplete="new-password"
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-            />
-          </div>
-
-          {error && <p className="text-xs text-destructive">{error}</p>}
-          {warning && <p className="text-xs text-amber-500">{warning}</p>}
-
-          <p className="text-[11px] text-muted-foreground">
-            Your password is encrypted with AES-256-GCM before it's stored. The key lives only on the server and never touches the database.
-          </p>
-
-          <div className="flex gap-2">
-            <Button onClick={connect} disabled={busy || !canSubmit} variant="gradient" className="flex-1">
-              {busy ? <><Loader2 className="h-4 w-4 animate-spin" />Connecting…</> : ic.connected ? 'Update' : 'Connect'}
-            </Button>
-            {ic.connected && (
-              <Button variant="ghost" onClick={disconnect} disabled={busy} className="text-destructive hover:bg-destructive/10">
-                Disconnect
               </Button>
             )}
           </div>
