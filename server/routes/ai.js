@@ -47,6 +47,44 @@ async function callAI({ systemPrompt, userPrompt, jsonMode = false, maxTokens = 
   return data.choices[0].message.content;
 }
 
+async function callAIVision({ systemPrompt, base64, mimeType, maxTokens = 2000 }) {
+  const body = {
+    model: process.env.GROQ_VISION_MODEL || 'meta-llama/llama-4-scout-17b-16e-instruct',
+    temperature: 0.15,
+    max_tokens: maxTokens,
+    response_format: { type: 'json_object' },
+    messages: [
+      { role: 'system', content: systemPrompt },
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'Extract every class and its grade from this screenshot.' },
+          { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } },
+        ],
+      },
+    ],
+  };
+
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    if (/model_not_found|does not exist|not found/i.test(detail)) {
+      throw new Error('Vision model not available. Try setting GROQ_VISION_MODEL to a different model.');
+    }
+    throw new Error(`Vision API error (${res.status}): ${detail.slice(0, 200)}`);
+  }
+  const data = await res.json();
+  return data.choices[0].message.content;
+}
+
 function normalizeHtml(html) {
   return html
     .replace(/<span[^>]*font-weight:\s*(bold|[6-9]00)[^>]*>([\s\S]*?)<\/span>/gi, '<strong>$2</strong>')
