@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
 import { Printer, Calculator, Cloud, CloudOff, RefreshCw, Pencil, Trash2, Loader2 } from 'lucide-react';
-import { api, getICStatus, saveICCredentials, disconnectIC, syncICGrades, updateClass } from '@/lib/api.js';
+import {
+  api, getICStatus, saveICCredentials, disconnectIC, previewICSync, syncICGradesSelected, updateClass,
+} from '@/lib/api.js';
 import { useApp } from '@/lib/store.jsx';
 import { computeGPA, classStats } from '@/lib/grades.js';
 import { Button } from '@/components/ui/button.jsx';
@@ -19,8 +21,9 @@ export default function Grades() {
   const [whatIf, setWhatIf] = useState({ classId: '', score: 90, maxScore: 100, weight: 1 });
   const [snapshotFor, setSnapshotFor] = useState(null);
   const [icOpen, setIcOpen] = useState(false);
-  const [ic, setIc] = useState({ connected: false, lastSync: null, district: null, state: null, username: null });
+  const [ic, setIc] = useState({ connected: false, lastSync: null, portalUrl: null, username: null });
   const [syncing, setSyncing] = useState(false);
+  const [previewData, setPreviewData] = useState(null);
 
   const loadAll = () =>
     Promise.all([api('/classes'), api('/assignments'), getICStatus().catch(() => ({ connected: false }))])
@@ -34,8 +37,6 @@ export default function Grades() {
 
   useEffect(() => { loadAll(); }, []);
 
-  // Effective assignments: for classes with a snapshot, drop real assignments
-  // and inject a single synthetic entry so computeGPA sees the snapshot grade.
   const effectiveAssignments = useMemo(() => {
     const out = [];
     for (const c of classes) {
@@ -125,10 +126,21 @@ export default function Grades() {
   const runICSync = async () => {
     setSyncing(true);
     try {
-      const r = await syncICGrades();
-      const m = r.matched?.length || 0;
-      const u = r.unmatched?.length || 0;
-      toast(`Synced ${m} class${m === 1 ? '' : 'es'}${u ? ` · ${u} unmatched` : ''}`);
+      const preview = await previewICSync();
+      setPreviewData(preview);
+    } catch (e) {
+      toast(e.message, 'error');
+    } finally { setSyncing(false); }
+  };
+
+  const applyPreview = async (selection) => {
+    setSyncing(true);
+    try {
+      const r = await syncICGradesSelected(selection);
+      const c = r.created?.length || 0;
+      const u = r.updated?.length || 0;
+      toast(`Imported ${c} new · updated ${u}`);
+      setPreviewData(null);
       await loadAll();
     } catch (e) {
       toast(e.message, 'error');
@@ -153,7 +165,7 @@ export default function Grades() {
       {ic.connected && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card/60 px-4 py-2 text-sm">
           <span className="text-muted-foreground">
-            Infinite Campus: <span className="font-medium text-foreground">{ic.district} · {ic.username}</span>
+            Infinite Campus: <span className="font-medium text-foreground">{ic.username}</span>
             {ic.lastSync && <> · last sync {new Date(ic.lastSync).toLocaleString()}</>}
           </span>
           <Button variant="outline" size="sm" onClick={runICSync} disabled={syncing}>
@@ -277,6 +289,11 @@ export default function Grades() {
         </div>
       </div>
 
+      <PreviewDialog
+        data={previewData}
+        onClose={() => setPreviewData(null)}
+        onApply={applyPreview}
+      />
       <SnapshotDialog
         cls={snapshotFor}
         onClose={() => setSnapshotFor(null)}
@@ -301,19 +318,126 @@ const Row = ({ label, before, after }) => (
   </div>
 );
 
+/* ---------- Preview dialog ---------- */
+
+function PreviewDialog({ data, onClose, onApply }) {
+  const [uncheckedCreates, setUncheckedCreates] = useState(new Set());
+  const [uncheckedUpdates, setUncheckedUpdates] = useState(new Set());
+
+  useEffect(() => {
+    setUncheckedCreates(new Set());
+    setUncheckedUpdates(new Set());
+  }, [data]);
+
+  if (!data) return null;
+
+  const toggle = (set, setFn, key) => {
+    const next = new Set(set);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    setFn(next);
+  };
+
+  const totalSelected =
+    (data.creates?.filter((c) => !uncheckedCreates.has(c.icName)).length || 0) +
+    (data.updates?.filter((u) => !uncheckedUpdates.has(u.icName)).length || 0);
+
+  const apply = () => {
+    onApply({
+      creates: (data.creates || []).filter((c) => !uncheckedCreates.has(c.icName)).map((c) => c.icName),
+      updates: (data.updates || []).filter((u) => !uncheckedUpdates.has(u.icName)).map((u) => u.icName),
+    });
+  };
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent
+        title="Import from Infinite Campus"
+        description="Uncheck anything you don't want to import. Selected items will be added or updated in your classes."
+        className="max-w-2xl"
+      >
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+          {data.creates?.length > 0 && (
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                New classes ({data.creates.length})
+              </p>
+              <div className="space-y-1">
+                {data.creates.map((c) => (
+                  <label key={c.icName} className="flex cursor-pointer items-center gap-3 rounded-md border p-2.5 text-sm hover:bg-accent">
+                    <input
+                      type="checkbox"
+                      checked={!uncheckedCreates.has(c.icName)}
+                      onChange={() => toggle(uncheckedCreates, setUncheckedCreates, c.icName)}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium">{c.icName}</span>
+                      {c.term && <span className="block text-[10px] text-muted-foreground">{c.term}</span>}
+                    </span>
+                    <span className="shrink-0 font-medium">
+                      {c.pct.toFixed(1)}%{c.letter ? ` · ${c.letter}` : ''}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {data.updates?.length > 0 && (
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Updates to existing classes ({data.updates.length})
+              </p>
+              <div className="space-y-1">
+                {data.updates.map((u) => (
+                  <label key={u.icName} className="flex cursor-pointer items-center gap-3 rounded-md border p-2.5 text-sm hover:bg-accent">
+                    <input
+                      type="checkbox"
+                      checked={!uncheckedUpdates.has(u.icName)}
+                      onChange={() => toggle(uncheckedUpdates, setUncheckedUpdates, u.icName)}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium">{u.currentName}</span>
+                      <span className="block truncate text-[10px] text-muted-foreground">
+                        matched IC "{u.icName}"{u.term ? ` · ${u.term}` : ''}
+                      </span>
+                    </span>
+                    <span className="shrink-0 font-medium">
+                      {u.pct.toFixed(1)}%{u.letter ? ` · ${u.letter}` : ''}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {(!data.creates?.length && !data.updates?.length) && (
+            <p className="py-4 text-center text-sm text-muted-foreground">Nothing to import.</p>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2 border-t">
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="gradient" onClick={apply} disabled={totalSelected === 0}>
+            Import {totalSelected} item{totalSelected === 1 ? '' : 's'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 /* ---------- Snapshot dialog ---------- */
 
 function parseGradeInput(raw) {
   const s = String(raw || '').trim();
   if (!s) return null;
-  // Match "143.26/158" or "143 / 158"
   const frac = s.match(/^([\d.]+)\s*\/\s*([\d.]+)$/);
   if (frac) {
     const a = Number(frac[1]);
     const b = Number(frac[2]);
     if (Number.isFinite(a) && Number.isFinite(b) && b > 0) return { score: a, max: b };
   }
-  // Match "95.97%" or "95.97"
   const pct = s.match(/^([\d.]+)\s*%?$/);
   if (pct) {
     const a = Number(pct[1]);
@@ -394,7 +518,7 @@ function SnapshotDialog({ cls, onClose, onSave, onClear }) {
 
 function ICDialog({ open, onClose, ic, onConnected, onDisconnected }) {
   const { toast } = useApp();
-  const [form, setForm] = useState({ district: '', state: '', username: '', password: '' });
+  const [form, setForm] = useState({ portalUrl: '', username: '', password: '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -402,8 +526,7 @@ function ICDialog({ open, onClose, ic, onConnected, onDisconnected }) {
     if (!open) return;
     setError('');
     setForm({
-      district: ic.district || '',
-      state: ic.state || '',
+      portalUrl: ic.portalUrl || '',
       username: ic.username || '',
       password: '',
     });
@@ -413,7 +536,7 @@ function ICDialog({ open, onClose, ic, onConnected, onDisconnected }) {
     setError('');
     setBusy(true);
     try {
-      await saveICCredentials(form.district, form.state, form.username, form.password);
+      await saveICCredentials(form.portalUrl, form.username, form.password);
       toast('Infinite Campus connected');
       await onConnected();
       onClose();
@@ -441,23 +564,27 @@ function ICDialog({ open, onClose, ic, onConnected, onDisconnected }) {
         title="Infinite Campus"
         description={ic.connected
           ? 'Connected. You can re-enter credentials or disconnect.'
-          : 'Enter your district and portal login. Credentials are encrypted on the server and never shared.'}
+          : 'Paste the portal URL from your browser while logged into Infinite Campus.'}
       >
         <div className="space-y-3">
           <div className="space-y-1">
-            <Label htmlFor="ic-district">District name</Label>
-            <Input id="ic-district" placeholder="e.g. Rockwood School District" value={form.district} onChange={(e) => setForm({ ...form, district: e.target.value })} />
+            <Label htmlFor="ic-url">Portal URL</Label>
+            <Input
+              id="ic-url"
+              placeholder="https://yourdistrict.infinitecampus.org/campus/...?appName=yourdistrict"
+              value={form.portalUrl}
+              onChange={(e) => setForm({ ...form, portalUrl: e.target.value })}
+            />
+            <p className="text-[10px] text-muted-foreground">
+              Copy from your browser's address bar while logged into IC. Must include <code>?appName=...</code>
+            </p>
           </div>
           <div className="space-y-1">
-            <Label htmlFor="ic-state">State (2 letters)</Label>
-            <Input id="ic-state" placeholder="MO" maxLength={2} value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value.toUpperCase() })} />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="ic-user">Username</Label>
+            <Label htmlFor="ic-user">IC username</Label>
             <Input id="ic-user" autoComplete="off" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="ic-pass">Password</Label>
+            <Label htmlFor="ic-pass">IC password</Label>
             <Input id="ic-pass" type="password" autoComplete="new-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
           </div>
           {error && <p className="text-xs text-destructive">{error}</p>}
@@ -465,7 +592,7 @@ function ICDialog({ open, onClose, ic, onConnected, onDisconnected }) {
             Credentials are encrypted with AES-256-GCM before being stored. The key lives only on the server and never touches the database.
           </p>
           <div className="flex gap-2">
-            <Button onClick={connect} disabled={busy || !form.district || !form.state || !form.username || !form.password} variant="gradient" className="flex-1">
+            <Button onClick={connect} disabled={busy || !form.portalUrl || !form.username || !form.password} variant="gradient" className="flex-1">
               {busy ? <><Loader2 className="h-4 w-4 animate-spin" />Saving…</> : ic.connected ? 'Update' : 'Connect'}
             </Button>
             {ic.connected && (
