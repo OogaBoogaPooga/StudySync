@@ -584,5 +584,75 @@ router.post('/chat', validate(z.object({
 
   res.json({ reply, sources });
 }));
+/* ---------- Screenshot grade importer ---------- */
 
+const GRADES_VISION_PROMPT = `You are an OCR assistant reading a screenshot of a student's grade portal (Infinite Campus, PowerSchool, Canvas, Skyward, etc.).
+
+Return ONLY valid JSON:
+{
+  "classes": [
+    { "name": "string (course name, exactly as shown)", "pct": number, "letter": "string or null" }
+  ]
+}
+
+RULES:
+- Extract EVERY course visible in the screenshot, even partially visible rows.
+- For each course, "name" is the course title, cleaned up: trim trailing whitespace, remove trailing section numbers or room codes if attached, but do not otherwise change the name.
+- If the grade is shown as a percentage like "94.27%" or "94.27", use that number.
+- If shown as a fraction like "167/174", compute percent = (167/174)*100 and use that rounded to 1 decimal.
+- If only a letter grade is shown, estimate using: A+=98, A=95, A-=92, B+=88, B=85, B-=82, C+=78, C=75, C-=72, D=65, F=55.
+- Include the letter grade if visible or inferable from pct.
+- Do NOT invent courses that aren't visible.
+- Preserve original casing where possible.
+- If the same course appears twice (e.g. from two terms), keep only the most recent one.
+- Ignore GPA values, term grades, overall averages, and student names. Only actual courses.`;
+
+router.post('/grades/scan', upload.single('file'), wrap(async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No image uploaded.' });
+
+  const mime = String(req.file.mimetype || '').toLowerCase();
+  if (!/^image\/(png|jpe?g|webp|gif)$/.test(mime)) {
+    return res.status(400).json({ error: 'Please upload a PNG, JPG, WEBP, or GIF image.' });
+  }
+  if (req.file.size > 5 * 1024 * 1024) {
+    return res.status(400).json({ error: 'Image too large. Max 5 MB.' });
+  }
+  if (!process.env.GROQ_API_KEY) {
+    return res.status(500).json({ error: 'AI is not configured on the server.' });
+  }
+
+  const base64 = req.file.buffer.toString('base64');
+
+  let raw;
+  try {
+    raw = await callAIVision({ systemPrompt: GRADES_VISION_PROMPT, base64, mimeType: mime });
+  } catch (e) {
+    console.error('[grades/scan] vision error:', e.message);
+    return res.status(502).json({ error: e.message });
+  }
+
+  let parsed;
+  try { parsed = JSON.parse(raw); }
+  catch { return res.status(502).json({ error: 'AI returned invalid JSON.' }); }
+
+  const classes = Array.isArray(parsed.classes)
+    ? parsed.classes
+        .map((c) => ({
+          name: String(c.name || '').trim().slice(0, 120),
+          pct: Number(c.pct),
+          letter: c.letter ? String(c.letter).trim().slice(0, 3) : null,
+        }))
+        .filter((c) => c.name && Number.isFinite(c.pct) && c.pct >= 0 && c.pct <= 150)
+    : [];
+
+  if (!classes.length) {
+    return res.status(422).json({
+      error: "Couldn't find any classes in that screenshot. Try a clearer image that shows the full grade list.",
+    });
+  }
+
+  res.json({ classes, detected: classes.length });
+}));
+
+export default router;
 export default router;
