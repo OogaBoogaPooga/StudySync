@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button.jsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card.jsx';
 import { Input, Label, Select } from '@/components/ui/input.jsx';
 import { Dialog, DialogContent } from '@/components/ui/dialog.jsx';
-import ScreenshotImportDialog from '@/components/ScreenshotImportDialog.jsx';
+import PasteGradesDialog from '@/components/PasteGradesDialog.jsx';
 
 ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
@@ -261,7 +261,7 @@ export default function Grades() {
         </div>
       </div>
 
-      <ScreenshotImportDialog
+      <PasteGradesDialog
         open={scanOpen}
         onClose={() => setScanOpen(false)}
         existingClasses={classes}
