@@ -68,3 +68,18 @@ export const syncICGradesSelected = (selection) =>
 // ---- Grade snapshots ----
 export const updateClass = (id, body) =>
   api(`/classes/${id}`, { method: 'PATCH', body });
+
+// ---- Screenshot grade import ----
+export async function scanGradesFromScreenshot(file) {
+  const fd = new FormData();
+  fd.append('file', file);
+  const token = getToken();
+  const res = await fetch('/api/ai/grades/scan', {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: fd,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Scan failed (${res.status})`);
+  return data;
+}
