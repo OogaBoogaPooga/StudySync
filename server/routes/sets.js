@@ -9,6 +9,112 @@ setRoutes.use(requireAuth);
 
 const cardSchema = z.object({ front: z.string().trim().min(1).max(1000), back: z.string().trim().min(1).max(2000) });
 
+/* ---------- Spaced repetition (SM-2 variant) ---------- */
+
+const MIN_EASE = 1.3;
+const MAX_EASE = 2.8;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const MAX_INTERVAL_DAYS = 365;
+
+function computeNextReview(card, grade, now) {
+  const isLearning = card.state === 'new' || card.state === 'learning' || (card.interval ?? 0) === 0;
+  const ease = card.ease ?? 2.5;
+  const interval = card.interval ?? 0;
+  const reps = card.reps ?? 0;
+  const lapses = card.lapses ?? 0;
+
+  const AGAIN_MS = 10 * 60 * 1000;
+  const HARD_MS = 60 * 60 * 1000;
+  const GOOD_DAYS = 1;
+  const EASY_DAYS = 4;
+
+  if (isLearning) {
+    if (grade === 'again') {
+      return {
+        ease: Math.max(MIN_EASE, ease - 0.2),
+        interval: AGAIN_MS / DAY_MS,
+        dueAt: new Date(now.getTime() + AGAIN_MS),
+        reps: 0,
+        lapses: card.state === 'new' ? lapses : lapses + 1,
+        state: 'learning',
+        lastReviewedAt: now,
+      };
+    }
+    if (grade === 'hard') {
+      return {
+        ease: Math.max(MIN_EASE, ease - 0.15),
+        interval: HARD_MS / DAY_MS,
+        dueAt: new Date(now.getTime() + HARD_MS),
+        reps: reps + 1,
+        lapses,
+        state: 'learning',
+        lastReviewedAt: now,
+      };
+    }
+    if (grade === 'good') {
+      return {
+        ease,
+        interval: GOOD_DAYS,
+        dueAt: new Date(now.getTime() + GOOD_DAYS * DAY_MS),
+        reps: reps + 1,
+        lapses,
+        state: 'review',
+        lastReviewedAt: now,
+      };
+    }
+    return {
+      ease: Math.min(MAX_EASE, ease + 0.15),
+      interval: EASY_DAYS,
+      dueAt: new Date(now.getTime() + EASY_DAYS * DAY_MS),
+      reps: reps + 1,
+      lapses,
+      state: 'review',
+      lastReviewedAt: now,
+    };
+  }
+
+  let newInterval = interval;
+  let newEase = ease;
+
+  if (grade === 'again') {
+    newEase = Math.max(MIN_EASE, ease - 0.2);
+    newInterval = Math.max(1, interval * 0.4);
+    return {
+      ease: newEase,
+      interval: newInterval,
+      dueAt: new Date(now.getTime() + newInterval * DAY_MS),
+      reps: 0,
+      lapses: lapses + 1,
+      state: 'learning',
+      lastReviewedAt: now,
+    };
+  }
+  if (grade === 'hard') {
+    newEase = Math.max(MIN_EASE, ease - 0.15);
+    newInterval = Math.max(1, interval * 1.2);
+  } else if (grade === 'good') {
+    newInterval = Math.max(1, interval * ease);
+  } else {
+    newEase = Math.min(MAX_EASE, ease + 0.15);
+    newInterval = Math.max(1, interval * ease * 1.3);
+  }
+
+  newInterval = Math.min(newInterval, MAX_INTERVAL_DAYS);
+  const newState = newInterval >= 21 ? 'mastered' : 'review';
+
+  return {
+    ease: newEase,
+    interval: newInterval,
+    dueAt: new Date(now.getTime() + newInterval * DAY_MS),
+    reps: reps + 1,
+    lapses,
+    state: newState,
+    lastReviewedAt: now,
+  };
+}
+
+/* ---------- Set routes ---------- */
+
 setRoutes.get('/', wrap(async (req, res) => {
   const sets = await prisma.studySet.findMany({
     where: { userId: req.user.id },
@@ -41,7 +147,6 @@ setRoutes.delete('/:id', wrap(async (req, res) => {
   res.status(204).end();
 }));
 
-/** Ownership check helper for card operations */
 async function ownedSet(setId, userId) {
   const set = await prisma.studySet.findFirst({ where: { id: setId, userId } });
   if (!set) throw Object.assign(new Error('Study set not found'), { status: 404 });
@@ -54,11 +159,32 @@ setRoutes.post('/:id/cards', validate(cardSchema), wrap(async (req, res) => {
   res.status(201).json(card);
 }));
 
-// Bulk insert (used by AI generator)
 setRoutes.post('/:id/cards/bulk', validate(z.object({ cards: z.array(cardSchema).min(1).max(100) })), wrap(async (req, res) => {
   await ownedSet(req.params.id, req.user.id);
   await prisma.flashcard.createMany({ data: req.body.cards.map((c) => ({ ...c, setId: req.params.id })) });
   res.status(201).json(await prisma.flashcard.findMany({ where: { setId: req.params.id } }));
+}));
+
+// Spaced repetition — record a review and reschedule the card
+setRoutes.post('/:id/cards/:cardId/review', validate(z.object({
+  grade: z.enum(['again', 'hard', 'good', 'easy']),
+})), wrap(async (req, res) => {
+  await ownedSet(req.params.id, req.user.id);
+
+  const card = await prisma.flashcard.findFirst({
+    where: { id: req.params.cardId, setId: req.params.id },
+  });
+  if (!card) return res.status(404).json({ error: 'Card not found' });
+
+  const now = new Date();
+  const update = computeNextReview(card, req.body.grade, now);
+
+  const updated = await prisma.flashcard.update({
+    where: { id: card.id },
+    data: update,
+  });
+
+  res.json(updated);
 }));
 
 setRoutes.delete('/:id/cards/:cardId', wrap(async (req, res) => {
