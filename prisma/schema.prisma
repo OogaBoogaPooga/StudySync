@@ -22,11 +22,13 @@ model User {
   quizAttempts QuizAttempt[]
 
   // Infinite Campus integration — credentials stored encrypted (AES-256-GCM)
-  icDistrict    String?
-  icState       String?
-  icUsername    String?
-  icPasswordEnc String?
-  icLastSync    DateTime?
+  icDistrict        String?
+  icState           String?
+  icUsername        String?
+  icPasswordEnc     String?
+  icLastSync        DateTime?
+  icPortalUrl       String?
+  icWorkingEndpoint String?
 }
 
 model Class {
