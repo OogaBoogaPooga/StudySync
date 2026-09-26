@@ -64,7 +64,7 @@ export default function MusicPill() {
       <style>{EQ_STYLE}</style>
       <div
         ref={wrapperRef}
-        className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-40 w-[min(340px,calc(100vw-2rem))]"
+        className="no-print fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-40 w-[min(340px,calc(100vw-2rem))]"
       >
         {/* Expanded panel */}
         <div
