@@ -68,11 +68,12 @@ export const syncICGradesSelected = (selection) =>
 // ---- Grade snapshots ----
 export const updateClass = (id, body) =>
   api(`/classes/${id}`, { method: 'PUT', body });
+
 // ---- Screenshot grade import ----
-export async function scanGradesFromScreenshot(file) { export const parseGradesFromText = (text) =>
-  api('/ai/grades/parse-text', { method: 'POST', body: { text } });
+export async function scanGradesFromScreenshot(files) {
+  const list = Array.isArray(files) ? files : [files];
   const fd = new FormData();
-  fd.append('file', file);
+  for (const f of list) fd.append('files', f);
   const token = getToken();
   const res = await fetch('/api/ai/grades/scan', {
     method: 'POST',
@@ -83,3 +84,7 @@ export async function scanGradesFromScreenshot(file) { export const parseGradesF
   if (!res.ok) throw new Error(data.error || `Scan failed (${res.status})`);
   return data;
 }
+
+// ---- Paste-grades-text import ----
+export const parseGradesFromText = (text) =>
+  api('/ai/grades/parse-text', { method: 'POST', body: { text } });
