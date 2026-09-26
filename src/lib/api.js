@@ -88,3 +88,7 @@ export async function scanGradesFromScreenshot(files) {
 // ---- Paste-grades-text import ----
 export const parseGradesFromText = (text) =>
   api('/ai/grades/parse-text', { method: 'POST', body: { text } });
+
+// ---- Spaced repetition ----
+export const reviewCard = (setId, cardId, grade) =>
+  api(`/sets/${setId}/cards/${cardId}/review`, { method: 'POST', body: { grade } });
