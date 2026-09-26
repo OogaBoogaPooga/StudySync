@@ -8,6 +8,64 @@ import { Textarea } from '@/components/ui/input.jsx';
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16'];
 
+/**
+ * Client-side parser for Infinite Campus gradebook copy-paste.
+ * IC ends each course block with "Citizenship" and puts the grade right
+ * below a "Term Grade" label. That structure lets us extract grades
+ * deterministically — no AI needed.
+ */
+function extractFromICPaste(text) {
+  const raw = String(text || '');
+  // Split into course blocks. Each block ends with "Citizenship".
+  const blocks = raw.split(/\bCitizenship\b/);
+  const rows = [];
+  const seen = new Set();
+
+  for (const block of blocks) {
+    const lines = block
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (lines.length < 3) continue;
+
+    const courseName = lines[0];
+    if (!courseName || courseName.length > 120) continue;
+
+    // Find the "Term Grade" anchor line
+    const tgIdx = lines.findIndex((l) => /^term grade$/i.test(l));
+    if (tgIdx === -1) continue;
+
+    let pct = null;
+    let letter = null;
+
+    // Look at up to 8 lines after "Term Grade" for a letter and a percent
+    for (let j = tgIdx + 1; j < Math.min(tgIdx + 8, lines.length); j++) {
+      const line = lines[j];
+      if (/^in-?progress$/i.test(line)) break;
+
+      // Percent, optionally wrapped in parentheses: "(94.27%)" or "94.27%"
+      const pm = line.match(/^\(?([\d.]+)\s*%\)?$/);
+      if (pm) {
+        pct = Number(pm[1]);
+        continue;
+      }
+
+      // Letter grade: A, A+, A-, B, B* (with optional asterisk)
+      if (!letter) {
+        const lm = line.match(/^([A-F])([+-])?(\*)?$/i);
+        if (lm) letter = line.toUpperCase();
+      }
+    }
+
+    if (pct != null && !seen.has(courseName.toLowerCase())) {
+      seen.add(courseName.toLowerCase());
+      rows.push({ name: courseName, pct, letter });
+    }
+  }
+
+  return rows;
+}
+
 export default function PasteGradesDialog({ open, onClose, existingClasses = [], onImported }) {
   const { toast } = useApp();
   const [text, setText] = useState('');
@@ -16,6 +74,7 @@ export default function PasteGradesDialog({ open, onClose, existingClasses = [],
   const [results, setResults] = useState(null);
   const [selected, setSelected] = useState(new Set());
   const [error, setError] = useState('');
+  const [usedAI, setUsedAI] = useState(false);
 
   useEffect(() => {
     if (open) return;
@@ -25,14 +84,29 @@ export default function PasteGradesDialog({ open, onClose, existingClasses = [],
     setError('');
     setParsing(false);
     setImporting(false);
+    setUsedAI(false);
   }, [open]);
 
   const parse = async () => {
-    if (text.trim().length < 10) return;
+    const raw = text.trim();
+    if (raw.length < 10) return;
     setParsing(true);
     setError('');
+    setUsedAI(false);
+
+    // 1) Deterministic client-side extraction (fast, free, precise)
+    const extracted = extractFromICPaste(raw);
+    if (extracted.length > 0) {
+      setResults(extracted);
+      setSelected(new Set(extracted.map((c) => c.name)));
+      setParsing(false);
+      return;
+    }
+
+    // 2) Fallback to the AI for other portals (PowerSchool, Canvas, etc.)
+    setUsedAI(true);
     try {
-      const data = await parseGradesFromText(text);
+      const data = await parseGradesFromText(raw);
       const classes = data.classes || [];
       setResults(classes);
       setSelected(new Set(classes.map((c) => c.name)));
@@ -104,7 +178,7 @@ export default function PasteGradesDialog({ open, onClose, existingClasses = [],
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent
         title="Import grades"
-        description="Select your grades on your school portal, copy them, and paste below. We'll parse them."
+        description="Copy your grades from your school portal and paste them below."
         className="max-w-2xl"
       >
         <div className="space-y-4">
@@ -114,17 +188,19 @@ export default function PasteGradesDialog({ open, onClose, existingClasses = [],
                 <p className="font-medium text-foreground">How to copy your grades:</p>
                 <ol className="mt-1.5 list-decimal space-y-1 pl-4">
                   <li>Open your grade portal in another tab</li>
-                  <li>Click the first class, hold <kbd className="rounded border bg-muted px-1 py-0.5 text-[10px]">Shift</kbd>, click the last class</li>
+                  <li>Click just before the first class name, hold <kbd className="rounded border bg-muted px-1 py-0.5 text-[10px]">Shift</kbd>, click just after the last grade</li>
                   <li>Press <kbd className="rounded border bg-muted px-1 py-0.5 text-[10px]">Ctrl/Cmd+C</kbd></li>
                   <li>Paste into the box below</li>
                 </ol>
-                <p className="mt-2">The AI reads whatever format your portal uses — percentages, fractions, or letter grades.</p>
+                <p className="mt-2">
+                  Don't worry about the extra stuff that gets copied (standards, competencies, etc.) — we filter it out.
+                </p>
               </div>
               <Textarea
-                rows={8}
+                rows={9}
                 value={text}
                 onChange={(e) => { setText(e.target.value); setError(''); }}
-                placeholder={`Paste here. Example:\n\nAP Chem      94.27%    A\nAPUSH        87.86%    B+\nAlgebra 2    91.00%    A-`}
+                placeholder="Paste your gradebook copy here…"
                 aria-label="Pasted grades"
                 autoFocus
               />
@@ -134,7 +210,9 @@ export default function PasteGradesDialog({ open, onClose, existingClasses = [],
           {stage === 'results' && (
             <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
               <p className="text-xs text-muted-foreground">
-                Found {results.length} {results.length === 1 ? 'class' : 'classes'}. Uncheck any you don't want.
+                Found {results.length} {results.length === 1 ? 'class' : 'classes'}.
+                {usedAI ? ' (parsed with AI)' : ' (parsed locally)'}
+                {' '}Uncheck any you don't want.
               </p>
               <div className="space-y-1">
                 {results.map((c) => {
@@ -177,7 +255,7 @@ export default function PasteGradesDialog({ open, onClose, existingClasses = [],
           <div className="flex justify-between gap-2 border-t pt-3">
             <div>
               {stage === 'results' && (
-                <Button variant="ghost" onClick={() => { setResults(null); setSelected(new Set()); }} disabled={importing}>
+                <Button variant="ghost" onClick={() => { setResults(null); setSelected(new Set()); setUsedAI(false); }} disabled={importing}>
                   Edit paste
                 </Button>
               )}
