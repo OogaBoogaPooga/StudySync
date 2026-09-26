@@ -397,7 +397,6 @@ function tokenize(str) {
     .filter((w) => w.length > 2 && !CHAT_STOPWORDS.has(w));
 }
 
-// Strip HTML tags/entities down to clean plain text
 function stripHtml(html) {
   return String(html || '')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
@@ -416,8 +415,6 @@ function stripHtml(html) {
     .trim();
 }
 
-// Split a set's HTML content into paragraph-sized chunks.
-// Prefers <p>, <h1-6>, <li> boundaries so each AI-generated entry stays whole.
 function chunksFromHtml(html, setTitle) {
   const src = String(html || '');
   const out = [];
@@ -427,7 +424,6 @@ function chunksFromHtml(html, setTitle) {
     const text = stripHtml(m[2]).trim();
     if (text.length >= 25) out.push({ text, setTitle });
   }
-  // Fallback: no structured tags — split on blank lines
   if (!out.length) {
     const plain = stripHtml(src);
     for (const para of plain.split(/\n{2,}/)) {
@@ -461,7 +457,6 @@ function rankCards(question, cards) {
     .map((s) => s.card);
 }
 
-// Same idea as rankCards, but for note paragraphs.
 function rankChunks(question, chunks) {
   const qTokens = tokenize(question);
   if (!qTokens.length) return [];
@@ -472,7 +467,6 @@ function rankChunks(question, chunks) {
     const tokens = tokenize(chunk.text);
     let score = 0;
     for (const t of tokens) if (qSet.has(t)) score += 1;
-    // Big bonus if the whole question appears verbatim
     if (chunk.text.toLowerCase().includes(qLower)) score += 10;
     return { chunk, score };
   });
@@ -508,7 +502,6 @@ router.post('/chat', validate(z.object({
     });
   }
 
-  // Both: rich-text notes AND flashcards
   const allCards = sets.flatMap((s) => s.cards.map((c) => ({ ...c, setTitle: s.title })));
   const allChunks = sets.flatMap((s) => chunksFromHtml(s.content, s.title));
 
@@ -524,31 +517,24 @@ router.post('/chat', validate(z.object({
 
   const passages = [];
   const sources = [];
-  let n = 1;
 
-  // Notes first — they're the richer source
   for (const c of topChunks) {
-    passages.push('[' + n + '] (from notes: "' + c.setTitle + '") ' + c.text);
+    passages.push('(from notes: "' + c.setTitle + '") ' + c.text);
     sources.push({ kind: 'note', setTitle: c.setTitle, text: c.text });
-    n++;
   }
   for (const c of topCards) {
-    passages.push('[' + n + '] (flashcard: "' + c.setTitle + '") ' + c.front + ' - ' + c.back);
+    passages.push('(flashcard: "' + c.setTitle + '") ' + c.front + ' - ' + c.back);
     sources.push({ kind: 'card', setTitle: c.setTitle, text: c.front + ' - ' + c.back });
-    n++;
   }
 
-  // Nothing matched — fall back to a sampling of the notes
   if (!passages.length) {
     for (const c of allChunks.slice(0, 8)) {
-      passages.push('[' + n + '] (from notes: "' + c.setTitle + '") ' + c.text);
+      passages.push('(from notes: "' + c.setTitle + '") ' + c.text);
       sources.push({ kind: 'note', setTitle: c.setTitle, text: c.text });
-      n++;
     }
     for (const c of allCards.slice(0, 4)) {
-      passages.push('[' + n + '] (flashcard: "' + c.setTitle + '") ' + c.front + ' - ' + c.back);
+      passages.push('(flashcard: "' + c.setTitle + '") ' + c.front + ' - ' + c.back);
       sources.push({ kind: 'card', setTitle: c.setTitle, text: c.front + ' - ' + c.back });
-      n++;
     }
   }
 
@@ -559,7 +545,8 @@ router.post('/chat', validate(z.object({
     '- If the user asks a factual question and the passages do not contain the answer, reply exactly: "I couldn\'t find that in your notes."' + NL +
     '- If the user asks a meta-question about their study material ("what should I study", "summarize this set"), recommend specific terms from the passages.' + NL +
     '- Be concise: 1-3 short paragraphs max.' + NL +
-    '- When you use a passage, cite it inline like [1], [2].' + NL +
+    '- Do NOT include bracketed citations like [1] or [2]. Just answer naturally.' + NL +
+    '- You may use **bold** to highlight key terms, but only 1-3 per response.' + NL +
     '- Do not invent facts. Do not use outside knowledge.';
 
   if (!process.env.GROQ_API_KEY) {
@@ -584,6 +571,7 @@ router.post('/chat', validate(z.object({
 
   res.json({ reply, sources });
 }));
+
 /* ---------- Screenshot grade importer ---------- */
 
 const GRADES_VISION_PROMPT = `You are an OCR assistant reading a screenshot of a student's grade portal (Infinite Campus, PowerSchool, Canvas, Skyward, etc.).
@@ -607,52 +595,66 @@ RULES:
 - If the same course appears twice (e.g. from two terms), keep only the most recent one.
 - Ignore GPA values, term grades, overall averages, and student names. Only actual courses.`;
 
-router.post('/grades/scan', upload.single('file'), wrap(async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No image uploaded.' });
+router.post('/grades/scan', upload.array('files', 10), wrap(async (req, res) => {
+  const files = Array.isArray(req.files) ? req.files : [];
+  if (!files.length) return res.status(400).json({ error: 'No images uploaded.' });
 
-  const mime = String(req.file.mimetype || '').toLowerCase();
-  if (!/^image\/(png|jpe?g|webp|gif)$/.test(mime)) {
-    return res.status(400).json({ error: 'Please upload a PNG, JPG, WEBP, or GIF image.' });
-  }
-  if (req.file.size > 5 * 1024 * 1024) {
-    return res.status(400).json({ error: 'Image too large. Max 5 MB.' });
-  }
   if (!process.env.GROQ_API_KEY) {
     return res.status(500).json({ error: 'AI is not configured on the server.' });
   }
 
-  const base64 = req.file.buffer.toString('base64');
-
-  let raw;
-  try {
-    raw = await callAIVision({ systemPrompt: GRADES_VISION_PROMPT, base64, mimeType: mime });
-  } catch (e) {
-    console.error('[grades/scan] vision error:', e.message);
-    return res.status(502).json({ error: e.message });
+  for (const f of files) {
+    const mime = String(f.mimetype || '').toLowerCase();
+    if (!/^image\/(png|jpe?g|webp|gif)$/.test(mime)) {
+      return res.status(400).json({ error: `"${f.originalname}" is not a supported image (PNG, JPG, WEBP, GIF).` });
+    }
+    if (f.size > 5 * 1024 * 1024) {
+      return res.status(400).json({ error: `"${f.originalname}" is too large. Max 5 MB per image.` });
+    }
   }
 
-  let parsed;
-  try { parsed = JSON.parse(raw); }
-  catch { return res.status(502).json({ error: 'AI returned invalid JSON.' }); }
+  const seen = new Map();
 
-  const classes = Array.isArray(parsed.classes)
-    ? parsed.classes
-        .map((c) => ({
-          name: String(c.name || '').trim().slice(0, 120),
-          pct: Number(c.pct),
-          letter: c.letter ? String(c.letter).trim().slice(0, 3) : null,
-        }))
-        .filter((c) => c.name && Number.isFinite(c.pct) && c.pct >= 0 && c.pct <= 150)
-    : [];
+  const results = await Promise.allSettled(files.map(async (f) => {
+    const base64 = f.buffer.toString('base64');
+    const mime = String(f.mimetype).toLowerCase();
+    const raw = await callAIVision({ systemPrompt: GRADES_VISION_PROMPT, base64, mimeType: mime });
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed.classes) ? parsed.classes : [];
+  }));
+
+  const errors = [];
+  for (let i = 0; i < results.length; i++) {
+    const r = results[i];
+    if (r.status === 'rejected') {
+      errors.push(`${files[i].originalname}: ${r.reason?.message || 'scan failed'}`);
+      continue;
+    }
+    for (const c of r.value) {
+      const name = String(c.name || '').trim().slice(0, 120);
+      const pct = Number(c.pct);
+      if (!name || !Number.isFinite(pct) || pct < 0 || pct > 150) continue;
+      const key = name.toLowerCase();
+      seen.set(key, {
+        name,
+        pct,
+        letter: c.letter ? String(c.letter).trim().slice(0, 3) : null,
+      });
+    }
+  }
+
+  const classes = [...seen.values()];
 
   if (!classes.length) {
     return res.status(422).json({
-      error: "Couldn't find any classes in that screenshot. Try a clearer image that shows the full grade list.",
+      error: "Couldn't find any classes in those screenshots. Try clearer images that show the full grade list.",
+      details: errors.length ? errors : undefined,
     });
   }
 
-  res.json({ classes, detected: classes.length });
+  res.json({ classes, detected: classes.length, errors: errors.length ? errors : undefined });
 }));
+
 /* ---------- Paste-grades-text importer ---------- */
 
 const GRADES_TEXT_PROMPT = `You are an OCR/parser for pasted grade-portal text. The user copied rows from their school portal (Infinite Campus, PowerSchool, Canvas, Skyward, etc.).
@@ -716,4 +718,5 @@ router.post('/grades/parse-text', validate(z.object({
 
   res.json({ classes, detected: classes.length });
 }));
+
 export default router;
