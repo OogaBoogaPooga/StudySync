@@ -26,6 +26,8 @@ const TOUR_STYLE = `
   transition:
     top 420ms cubic-bezier(0.22, 1, 0.36, 1),
     left 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    right 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    bottom 420ms cubic-bezier(0.22, 1, 0.36, 1),
     opacity 220ms ease;
 }
 .tour-tooltip-content { animation: tour-fade-content 320ms cubic-bezier(0.22, 1, 0.36, 1); }
@@ -35,16 +37,6 @@ const TOUR_STYLE = `
 }
 `;
 
-/* ------------------------------------------------------------------ */
-/* Steps                                                                */
-/*                                                                      */
-/* - target:       what to spotlight (selector string or {tag,text})    */
-/* - navRoute:     if set, Next pulses the sidebar item then navigates  */
-/* - clickOnNext:  target to click when user presses Next               */
-/* - closeDialog:  if true, clicking Next first closes any open dialog  */
-/* - route:        page to navigate to when the step arrives            */
-/* ------------------------------------------------------------------ */
-
 const STEPS = [
   {
     id: 'welcome',
@@ -53,8 +45,6 @@ const STEPS = [
     route: null,
     target: null,
   },
-
-  // --- Focus section ---
   {
     id: 'focus-nav',
     title: 'Focus',
@@ -81,13 +71,11 @@ const STEPS = [
   {
     id: 'focus-running',
     title: 'Timer is running',
-    body: 'Notice it counts down. It keeps going even if you switch tabs or leave the page entirely. Next, I\'ll pause it for you.',
+    body: "Notice it counts down. It keeps going even if you switch tabs or leave the page entirely. Next, I'll pause it for you.",
     route: '/focus',
     target: '[role="timer"]',
     clickOnNext: { tag: 'button', text: 'Pause' },
   },
-
-  // --- Notes section ---
   {
     id: 'notes-nav',
     title: 'Notes',
@@ -110,10 +98,9 @@ const STEPS = [
     body: 'Two options: drop a file in the top button, or paste lecture notes in the box. Everything gets converted into concise study notes.',
     route: '/notes',
     target: '[role="dialog"]',
+    modal: true,
     closeDialog: true,
   },
-
-  // --- Grades section ---
   {
     id: 'grades-nav',
     title: 'Grades',
@@ -136,10 +123,9 @@ const STEPS = [
     body: 'Just copy the grade list from Infinite Campus, PowerSchool, or similar, and paste it here. The parser handles it and updates your GPA.',
     route: '/grades',
     target: '[role="dialog"]',
+    modal: true,
     closeDialog: true,
   },
-
-  // --- Rooms ---
   {
     id: 'rooms-nav',
     title: 'Study Rooms',
@@ -155,8 +141,6 @@ const STEPS = [
     route: '/rooms',
     target: 'main',
   },
-
-  // --- Done ---
   {
     id: 'done',
     title: "That's the tour",
@@ -171,6 +155,7 @@ const WAIT_TIMEOUT_MS = 5000;
 const PAD = 6;
 const TOOLTIP_W = 340;
 const TOOLTIP_H = 210;
+const CORNER_MARGIN = 24;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -245,7 +230,7 @@ function computeTooltipPosition(rect) {
 
   left = Math.max(margin, Math.min(left, vw - TOOLTIP_W - margin));
   top = Math.max(margin, Math.min(top, vh - TOOLTIP_H - margin));
-  return { left, top };
+  return { top, left };
 }
 
 export default function Tour() {
@@ -284,7 +269,6 @@ export default function Tour() {
     setStepIndex(0);
   }, []);
 
-  // Auto-start for demo account
   useEffect(() => {
     if (!user) return;
     let seen = false;
@@ -296,7 +280,6 @@ export default function Tour() {
     return () => clearTimeout(t);
   }, [user]);
 
-  // Manual restart
   useEffect(() => {
     const onStart = () => start();
     window.addEventListener('studysync:startTour', onStart);
@@ -311,23 +294,18 @@ export default function Tour() {
     const run = async () => {
       setRectReady(false);
 
-      // Cross-page navigation?
       const needsNav = step.route && locationRef.current !== step.route;
 
       if (needsNav) {
-        // Fade out the tour so we're showing the actual page transition,
-        // not a black screen with a spinner.
         setSpotlightOpacity(0);
         setTooltipOpacity(0);
         await sleep(160);
         if (cancelled) return;
         navigate(step.route);
-        // Wait for React to render the new page
         await sleep(200);
         if (cancelled) return;
       }
 
-      // Poll for target
       if (step.target) {
         const started = Date.now();
         while (!cancelled && Date.now() - started < WAIT_TIMEOUT_MS) {
@@ -350,7 +328,6 @@ export default function Tour() {
           }
           await sleep(90);
         }
-        // Timeout: centered fallback
         if (!cancelled) {
           setRect(null);
           setRectReady(true);
@@ -358,7 +335,6 @@ export default function Tour() {
           setTooltipOpacity(1);
         }
       } else {
-        // No target: centered card
         if (cancelled) return;
         setRect(null);
         setRectReady(true);
@@ -373,7 +349,7 @@ export default function Tour() {
     return () => { cancelled = true; };
   }, [stepIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Continuous re-measure of the spotlight while it's showing (handles layout shifts)
+  // Continuous re-measure
   useEffect(() => {
     if (!step || !rect || !rectReady) return;
     const interval = setInterval(() => {
@@ -388,7 +364,6 @@ export default function Tour() {
           width: r.width + PAD * 2,
           height: r.height + PAD * 2,
         };
-        // Only update if there's a meaningful change
         const changed =
           Math.abs(prev.top - next.top) > 1 ||
           Math.abs(prev.left - next.left) > 1 ||
@@ -400,14 +375,11 @@ export default function Tour() {
     return () => clearInterval(interval);
   }, [step, rectReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ------- Next / Prev -------
-
   const goNext = useCallback(async () => {
     if (!step || transitioning) return;
     setTransitioning(true);
     try {
       if (step.navRoute) {
-        // Simulate the sidebar click, then navigate
         const el = findTargetEl(step.target);
         if (el) {
           el.classList.add('tour-click-pulse');
@@ -472,49 +444,85 @@ export default function Tour() {
 
   const isFirst = stepIndex === 0;
   const isLast = stepIndex === STEPS.length - 1;
+  const isModal = !!step.modal;
 
-  // Compute tooltip anchor position from current rect (or center for fallback)
-  let tooltipAnchor = null;
-  if (rectReady && rect) {
-    tooltipAnchor = computeTooltipPosition(rect);
+  // Compute tooltip position. Modal steps use a fixed corner so the tooltip
+  // never overlaps the centered dialog.
+  let tooltipStyle = null;
+  if (rectReady) {
+    if (rect && !isModal) {
+      const pos = computeTooltipPosition(rect);
+      tooltipStyle = { top: pos.top, left: pos.left, width: TOOLTIP_W, transform: 'none' };
+    } else if (rect && isModal) {
+      // Fixed bottom-right corner
+      tooltipStyle = {
+        bottom: CORNER_MARGIN,
+        right: CORNER_MARGIN,
+        width: TOOLTIP_W,
+        top: 'auto',
+        left: 'auto',
+        transform: 'none',
+      };
+    } else {
+      // No rect → centered card
+      tooltipStyle = {
+        top: '50%',
+        left: '50%',
+        width: Math.min(TOOLTIP_W + 40, window.innerWidth - 32),
+        transform: 'translate(-50%, -50%)',
+      };
+    }
   }
 
   return (
     <>
       <style>{TOUR_STYLE}</style>
 
-      {/* Spotlight / backdrop — always mounted, animated */}
-      <div
-        className="tour-spotlight fixed z-[200]"
-        style={{
-          top: rect && rectReady ? rect.top : window.innerHeight / 2 - 20,
-          left: rect && rectReady ? rect.left : window.innerWidth / 2 - 20,
-          width: rect && rectReady ? rect.width : 40,
-          height: rect && rectReady ? rect.height : 40,
-          boxShadow: '0 0 0 9999px rgba(0,0,0,0.68)',
-          outline: rect && rectReady ? '2px solid hsl(var(--primary))' : '2px solid transparent',
-          outlineOffset: 0,
-          borderRadius: '8px',
-          opacity: spotlightOpacity,
-          pointerEvents: 'auto',
-          cursor: 'pointer',
-        }}
-        onClick={close}
-        aria-hidden="true"
-      />
+      {/* Spotlight — hidden for modal steps (dialog is centered, dim would hurt) */}
+      {!isModal && (
+        <div
+          className="tour-spotlight fixed z-[200]"
+          style={{
+            top: rect && rectReady ? rect.top : window.innerHeight / 2 - 20,
+            left: rect && rectReady ? rect.left : window.innerWidth / 2 - 20,
+            width: rect && rectReady ? rect.width : 40,
+            height: rect && rectReady ? rect.height : 40,
+            boxShadow: '0 0 0 9999px rgba(0,0,0,0.68)',
+            outline: rect && rectReady ? '2px solid hsl(var(--primary))' : '2px solid transparent',
+            outlineOffset: 0,
+            borderRadius: '8px',
+            opacity: spotlightOpacity,
+            pointerEvents: 'auto',
+            cursor: 'pointer',
+          }}
+          onClick={close}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Modal steps: subtle ring around the dialog, no dim */}
+      {isModal && rect && rectReady && (
+        <div
+          className="tour-spotlight fixed z-[200] pointer-events-none"
+          style={{
+            top: rect.top,
+            left: rect.left,
+            width: rect.width,
+            height: rect.height,
+            boxShadow: '0 0 0 9999px rgba(0,0,0,0.35), 0 0 0 2px hsl(var(--primary))',
+            outline: 'none',
+            borderRadius: '12px',
+            opacity: spotlightOpacity,
+          }}
+          aria-hidden="true"
+        />
+      )}
 
       {/* Tooltip */}
-      {rectReady && (
+      {rectReady && tooltipStyle && (
         <div
           className="tour-tooltip-anchor fixed z-[210]"
-          style={{
-            top: rect ? tooltipAnchor.top : '50%',
-            left: rect ? tooltipAnchor.left : '50%',
-            width: TOOLTIP_W,
-            opacity: tooltipOpacity,
-            transform: rect ? 'none' : 'translate(-50%, -50%)',
-            pointerEvents: tooltipOpacity > 0.5 ? 'auto' : 'none',
-          }}
+          style={{ ...tooltipStyle, opacity: tooltipOpacity, pointerEvents: tooltipOpacity > 0.5 ? 'auto' : 'none' }}
           role="dialog"
           aria-label={step.title}
         >
@@ -560,7 +568,7 @@ export default function Tour() {
         </div>
       )}
 
-      {/* First-step backdrop — pointer catcher when tooltip is centered */}
+      {/* Backdrop for the first-step centered card */}
       {isFirst && (
         <div
           className="fixed inset-0 z-[205]"
