@@ -21,7 +21,7 @@ export default function TimerBadge() {
     <button
       onClick={() => navigate('/focus')}
       className={cn(
-        'fixed top-20 right-4 md:top-6 md:right-6 z-40',
+        'no-print fixed top-20 right-4 md:top-6 md:right-6 z-40',
         'flex items-center gap-2 rounded-full px-3 py-2',
         'border border-border/70 bg-card/85 backdrop-blur-xl shadow-lg',
         'transition-transform hover:scale-[1.02] active:scale-[0.98]'
