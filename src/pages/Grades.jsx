@@ -119,6 +119,7 @@ export default function Grades() {
   };
 
   const sourceLabel = (src) => {
+    if (src === 'paste') return 'Paste';     
     if (src === 'screenshot') return 'Screenshot';
     if (src === 'infinitecampus') return 'IC';
     return 'Manual';
