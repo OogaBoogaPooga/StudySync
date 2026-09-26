@@ -663,7 +663,7 @@ function ICDialog({ open, onClose, ic, onConnected, onDisconnected }) {
             <Input
               id="ic-user"
               autoComplete="off"
-              placeholder="e.g. 4221190397"
+              placeholder="Your IC username"
               value={form.username}
               onChange={(e) => setForm({ ...form, username: e.target.value })}
             />
