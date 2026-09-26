@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input, Label, Select } from '@/components/ui/input.jsx';
 import { Dialog, DialogContent } from '@/components/ui/dialog.jsx';
 import PasteGradesDialog from '@/components/PasteGradesDialog.jsx';
+import UpcomingWorkCallout from '@/components/UpcomingWorkCallout.jsx';
 
 ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
@@ -119,7 +120,7 @@ export default function Grades() {
   };
 
   const sourceLabel = (src) => {
-    if (src === 'paste') return 'Paste';     
+    if (src === 'paste') return 'Paste';
     if (src === 'screenshot') return 'Screenshot';
     if (src === 'infinitecampus') return 'IC';
     return 'Manual';
@@ -131,7 +132,7 @@ export default function Grades() {
         <div>
           <h1 className="text-2xl font-bold">Grades & GPA</h1>
           <p className="text-sm text-muted-foreground">
-            Import your grades from a screenshot, or edit any class manually with the pencil icon.
+            Import your grades from a paste, or edit any class manually with the pencil icon.
           </p>
         </div>
         <div className="flex gap-2 no-print">
@@ -155,10 +156,12 @@ export default function Grades() {
         <Card className="md:col-span-2">
           <CardHeader><CardTitle>Performance by class</CardTitle></CardHeader>
           <CardContent className="h-48">
-            {graded.length ? <Bar data={barData} options={{ maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { min: 0, max: 100 } } }} /> : <p className="text-sm text-muted-foreground">No graded classes yet. Import from a screenshot to get started.</p>}
+            {graded.length ? <Bar data={barData} options={{ maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { min: 0, max: 100 } } }} /> : <p className="text-sm text-muted-foreground">No graded classes yet. Import from a paste to get started.</p>}
           </CardContent>
         </Card>
       </div>
+
+      <UpcomingWorkCallout assignments={assignments} classes={classes} />
 
       <div className="grid lg:grid-cols-[1fr_340px] gap-4">
         <Card>

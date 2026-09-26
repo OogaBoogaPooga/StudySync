@@ -13,14 +13,22 @@ import sessionRoutes from './routes/sessions.js';
 import { setRoutes, shareRoutes } from './routes/sets.js';
 import aiRoutes from './routes/ai.js';
 import quizzesRoutes from './routes/quizzes.js';
-import shareEditRoutes from './routes/shareEdit.js'; 
+import shareEditRoutes from './routes/shareEdit.js';
 import infiniteCampusRoutes from './routes/infinitecampus.js';
+import activityRoutes from './routes/activity.js';
 import { setupSockets } from './socket.js';
 
 if (!process.env.JWT_SECRET) {
   console.error('❌ JWT_SECRET is missing. Copy .env.example to .env and set it.');
   process.exit(1);
 }
+
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err?.message || err);
+});
+process.on('unhandledRejection', (err) => {
+  console.error('[unhandledRejection]', err?.message || err);
+});
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -29,7 +37,6 @@ const PORT = process.env.PORT || 4000;
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
-// API routes
 app.get('/api/health', (_req, res) => res.json({ ok: true, time: new Date().toISOString() }));
 app.use('/api/auth', authRoutes);
 app.use('/api/classes', classRoutes);
@@ -39,27 +46,24 @@ app.use('/api/sets', setRoutes);
 app.use('/api/share', shareRoutes);
 app.use('/api/share', shareEditRoutes);
 app.use('/api/ai', aiRoutes);
-app.use('/api/quizzes', quizzesRoutes); 
+app.use('/api/quizzes', quizzesRoutes);
 app.use('/api/ic', infiniteCampusRoutes);
+app.use('/api/activity', activityRoutes);
 
-// Public-domain study music from the /data volume
 app.use('/api/music', express.static('/data/music', { maxAge: '7d', immutable: true }));
 
-// In production, serve the built React app from /dist
 if (process.env.NODE_ENV === 'production') {
   const dist = path.join(__dirname, '..', 'dist');
   app.use(express.static(dist, { maxAge: '1y', immutable: true, index: false }));
   app.get('*', (_req, res) => res.sendFile(path.join(dist, 'index.html')));
 }
 
-// Central error handler — never leak stack traces to clients
 app.use((err, _req, res, _next) => {
   console.error(err);
   if (err.code === 'P2025') return res.status(404).json({ error: 'Record not found' });
   res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
 });
 
-// Last-resort handlers — keep the process alive if a third-party library // throws an uncaught async error (like infinite-campus does on district lookup failure). process.on('uncaughtException', (err) => {   console.error('[uncaughtException]', err?.message || err); }); process.on('unhandledRejection', (err) => {   console.error('[unhandledRejection]', err?.message || err); });
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
 setupSockets(io);

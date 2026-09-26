@@ -92,3 +92,6 @@ export const parseGradesFromText = (text) =>
 // ---- Spaced repetition ----
 export const reviewCard = (setId, cardId, grade) =>
   api(`/sets/${setId}/cards/${cardId}/review`, { method: 'POST', body: { grade } });
+
+// ---- Activity / streaks ----
+export const getStreakStats = (days = 30) => api(`/activity/streak?days=${days}`);

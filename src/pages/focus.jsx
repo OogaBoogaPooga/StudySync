@@ -8,6 +8,7 @@ import { useApp } from '@/lib/store.jsx';
 import { useMusic } from '@/lib/music.jsx';
 import { useTimer } from '@/lib/timer.jsx';
 import MusicSidebar from '@/components/MusicSidebar.jsx';
+import StreakCard from '@/components/StreakCard.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card.jsx';
 import { Input, Textarea } from '@/components/ui/input.jsx';
@@ -43,13 +44,11 @@ export default function Focus() {
   useEffect(() => { loadHistory(); }, []);
   useEffect(() => { loadHistory(); }, [timer.round]);
 
-  // Auto-start music on Focus page
   useEffect(() => {
     if (music.enabled && !music.playing) music.play();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-save notes
   useEffect(() => {
     const t = setTimeout(() => {
       localStorage.setItem(NOTES_KEY, notes);
@@ -58,13 +57,11 @@ export default function Focus() {
     return () => clearTimeout(t);
   }, [notes]);
 
-  // Surface timer toasts
   useEffect(() => {
     if (timer.toast) toast(timer.toast.message);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timer.toast?.id]);
 
-  // Tab title
   useEffect(() => {
     const label = timer.mode === 'focus' ? 'Focus' : 'Break';
     document.title = timer.running ? `${fmt(timer.remaining)} · ${label} — StudySync` : 'StudySync';
@@ -150,6 +147,7 @@ export default function Focus() {
       </div>
 
       <div className="space-y-6">
+        <StreakCard />
         <MusicSidebar />
 
         <Card>
