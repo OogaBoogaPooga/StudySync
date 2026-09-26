@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
-import { Printer, Calculator, Pencil, Trash2, Camera } from 'lucide-react';
+import { Printer, Calculator, Pencil, Trash2, ClipboardPaste } from 'lucide-react';
 import { api, updateClass } from '@/lib/api.js';
 import { useApp } from '@/lib/store.jsx';
 import { computeGPA, classStats } from '@/lib/grades.js';
@@ -135,7 +135,7 @@ export default function Grades() {
         </div>
         <div className="flex gap-2 no-print">
           <Button variant="outline" onClick={() => setScanOpen(true)}>
-            <Camera className="h-4 w-4" />Import from screenshot
+            <ClipboardPaste className="h-4 w-4" />Import grades
           </Button>
           <Button variant="outline" onClick={() => window.print()}>
             <Printer className="h-4 w-4" />Export PDF
