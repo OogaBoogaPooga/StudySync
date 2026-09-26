@@ -48,7 +48,7 @@ export default function InstallBanner() {
   };
 
   return (
-    <div className="fixed bottom-20 md:bottom-6 left-4 right-4 md:left-auto md:right-6 md:w-[360px] z-[190] flex items-center gap-3 rounded-xl border border-border/60 bg-card/95 px-3 py-2.5 shadow-2xl backdrop-blur animate-fade-in">
+    <div className="no-print fixed bottom-20 md:bottom-6 left-4 right-4 md:left-auto md:right-6 md:w-[360px] z-[190] flex items-center gap-3 rounded-xl border border-border/60 bg-card/95 px-3 py-2.5 shadow-2xl backdrop-blur animate-fade-in">
       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10">
         <Download className="h-4 w-4 text-primary" />
       </span>
