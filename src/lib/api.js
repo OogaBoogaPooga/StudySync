@@ -69,7 +69,8 @@ export const syncICGradesSelected = (selection) =>
 export const updateClass = (id, body) =>
   api(`/classes/${id}`, { method: 'PUT', body });
 // ---- Screenshot grade import ----
-export async function scanGradesFromScreenshot(file) {
+export async function scanGradesFromScreenshot(file) { export const parseGradesFromText = (text) =>
+  api('/ai/grades/parse-text', { method: 'POST', body: { text } });
   const fd = new FormData();
   fd.append('file', file);
   const token = getToken();
