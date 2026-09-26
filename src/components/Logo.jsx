@@ -5,12 +5,10 @@ const LS_KEY = 'studysync_quokka';
 const CLICK_WINDOW_MS = 1500;
 
 /**
- * StudySync logo. Uses the hand-drawn book + pencil illustration.
+ * StudySync logo.
  *
  * Easter egg: click three times within 1.5s to swap to a quokka.
  * Three more clicks revert. Persists via localStorage.
- *
- * Dark mode: the illustration is auto-inverted so black strokes stay visible.
  */
 export default function Logo({ size = 'md', className }) {
   const [quokka, setQuokka] = useState(() => {
@@ -45,17 +43,11 @@ export default function Logo({ size = 'md', className }) {
       aria-label="StudySync"
       title="StudySync"
     >
-      {quokka ? (
-        <span className={cn('grid aspect-square place-items-center overflow-hidden rounded-xl ring-1 ring-inset ring-white/20 shadow-md bg-card', h)}>
-          <img src="/quokka.jpg" alt="" className="h-full w-full object-cover" />
-        </span>
-      ) : (
-        <img
-          src="/logo.png"
-          alt="StudySync"
-          className={cn('w-auto object-contain dark:invert', h)}
-        />
-      )}
+      <img
+        src={quokka ? '/quokka.jpg' : '/logo.png'}
+        alt="StudySync"
+        className={cn('w-auto object-contain', h)}
+      />
     </button>
   );
 }
