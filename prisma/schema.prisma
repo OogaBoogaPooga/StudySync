@@ -11,7 +11,7 @@ model User {
   id          String         @id @default(cuid())
   email       String         @unique
   name        String
-  password    String // bcrypt hash
+  password    String
   createdAt   DateTime       @default(now())
   classes     Class[]
   assignments Assignment[]
@@ -21,7 +21,6 @@ model User {
   quizzes      Quiz[]
   quizAttempts QuizAttempt[]
 
-  // Infinite Campus integration — credentials stored encrypted (AES-256-GCM)
   icDistrict        String?
   icState           String?
   icUsername        String?
@@ -34,17 +33,16 @@ model User {
 model Class {
   id          String       @id @default(cuid())
   name        String
-  color       String       @default("#6366f1") // accent color per subject
-  credits     Float        @default(3) // used for weighted GPA
+  color       String       @default("#6366f1")
+  credits     Float        @default(3)
   userId      String
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   assignments Assignment[]
 
-  // Manual or synced grade snapshot — overrides assignment-based calc when set
   snapshotScore     Float?
   snapshotMax       Float?
   snapshotUpdatedAt DateTime?
-  snapshotSource    String? // 'manual' | 'infinitecampus'
+  snapshotSource    String?
 }
 
 model Assignment {
@@ -52,7 +50,7 @@ model Assignment {
   title       String
   description String?
   dueDate     DateTime
-  progress    Int      @default(0) // 0-100
+  progress    Int      @default(0)
   completed   Boolean  @default(false)
   score       Float?
   maxScore    Float    @default(100)
@@ -94,6 +92,14 @@ model Flashcard {
   back  String
   setId String
   set   StudySet @relation(fields: [setId], references: [id], onDelete: Cascade)
+
+  dueAt          DateTime?
+  interval       Float    @default(0)
+  ease           Float    @default(2.5)
+  reps           Int      @default(0)
+  lapses         Int      @default(0)
+  state          String   @default("new")
+  lastReviewedAt DateTime?
 }
 
 model ChatMessage {
