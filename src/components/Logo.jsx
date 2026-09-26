@@ -4,12 +4,6 @@ import { cn } from '@/lib/utils';
 const LS_KEY = 'studysync_quokka';
 const CLICK_WINDOW_MS = 1500;
 
-/**
- * StudySync logo — small tile with the mark, text to the right.
- *
- * Easter egg: click the tile three times within 1.5s to swap to a quokka.
- * Three more clicks revert. Persists via localStorage.
- */
 export default function Logo({ size = 'md', className }) {
   const [quokka, setQuokka] = useState(() => {
     try { return localStorage.getItem(LS_KEY) === '1'; } catch { return false; }
@@ -29,20 +23,20 @@ export default function Logo({ size = 'md', className }) {
   };
 
   const tileSize =
-    size === 'sm' ? 'h-8 w-8 rounded-lg' :
-    size === 'lg' ? 'h-12 w-12 rounded-2xl' :
-    'h-9 w-9 rounded-xl';
+    size === 'sm' ? 'h-10 w-10 rounded-lg' :
+    size === 'lg' ? 'h-14 w-14 rounded-2xl' :
+    'h-11 w-11 rounded-xl';
 
   const textSize =
-    size === 'sm' ? 'text-base' :
-    size === 'lg' ? 'text-2xl' :
-    'text-lg';
+    size === 'sm' ? 'text-lg' :
+    size === 'lg' ? 'text-3xl' :
+    'text-xl';
 
   return (
     <button
       type="button"
       onClick={handleClick}
-      className={cn('flex items-center gap-2 select-none focus:outline-none', className)}
+      className={cn('flex items-center gap-2.5 select-none focus:outline-none', className)}
       aria-label="StudySync"
       title="StudySync"
     >
