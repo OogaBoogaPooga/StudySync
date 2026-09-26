@@ -75,12 +75,24 @@ export default function StudySet() {
     const title = set?.title || 'this set';
     const prompts = {
       Explain: `Explain the key ideas in the set "${title}" in 2-3 short paragraphs, using only the notes.`,
-      Quiz: `Quiz me on the set "${title}". Ask 5 questions one at a time and wait for my answer before revealing the correct one.`,
       Practice: `Give me 3 practice problems based on the set "${title}", then show the answers at the end.`,
     };
     window.dispatchEvent(new CustomEvent('studysync:chat', {
       detail: { setId: id, prompt: prompts[kind] },
     }));
+  };
+
+  const takeQuiz = async () => {
+    setQuizBusy(true);
+    try {
+      const res = await generateQuiz(id, 10, ['mcq', 'short']);
+      const quizId = res.quiz?.id || res.id;
+      navigate(`/quiz/${quizId}`);
+    } catch (e) {
+      toast(e.message, 'error');
+    } finally {
+      setQuizBusy(false);
+    }
   };
 
   const addCard = async (e) => {
@@ -96,18 +108,6 @@ export default function StudySet() {
       await api(`/sets/${id}/cards/${c.id}`, { method: 'DELETE' });
       setSet({ ...set, cards: set.cards.filter((x) => x.id !== c.id) });
     } catch (err) { toast(err.message, 'error'); }
-  };
-  const takeQuiz = async () => {
-    setQuizBusy(true);
-    try {
-      const res = await generateQuiz(id, 10, ['mcq', 'short']);
-      const quizId = res.quiz?.id || res.id;
-      navigate(`/quiz/${quizId}`);
-    } catch (e) {
-      toast(e.message, 'error');
-    } finally {
-      setQuizBusy(false);
-    }
   };
   const share = async () => {
     if (!set?.shareId) return;
@@ -159,10 +159,6 @@ export default function StudySet() {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={share}><Share2 className="h-4 w-4" />Share</Button>
-          <Button variant="outline" size="sm" onClick={() => setAiOpen(true)}><Sparkles className="h-4 w-4 text-violet-500" />AI flashcards</Button>
-          <Button variant="outline" size="sm" disabled={!set.cards.length || quizBusy} onClick={takeQuiz}>
-            {quizBusy ? 'Generating…' : 'AI Quiz'}
-          </Button>
           <Button variant="gradient" size="sm" disabled={!set.cards.length} onClick={() => setStudy(true)}>
             <Play className="h-4 w-4" />Study {dueCount > 0 ? `(${dueCount} due)` : `(${set.cards.length})`}
           </Button>
@@ -198,14 +194,14 @@ export default function StudySet() {
         {metaSaving && <span className="text-[10px] text-muted-foreground">Saving…</span>}
       </div>
 
-      {/* AI tutor actions */}
+      {/* AI tutor actions — single row for all AI actions */}
       <div className="flex flex-wrap gap-2 rounded-lg border bg-card/40 p-2">
         <span className="self-center px-2 text-[11px] uppercase tracking-wide text-muted-foreground">AI tutor</span>
         <Button variant="outline" size="sm" onClick={() => askAI('Explain')}>
           <Sparkles className="h-3.5 w-3.5 text-violet-500" />Explain
         </Button>
-        <Button variant="outline" size="sm" onClick={() => askAI('Quiz')}>
-          <HelpCircle className="h-3.5 w-3.5 text-sky-500" />Quiz me
+        <Button variant="outline" size="sm" disabled={!set.cards.length || quizBusy} onClick={takeQuiz}>
+          <HelpCircle className="h-3.5 w-3.5 text-sky-500" />{quizBusy ? 'Generating…' : 'Quiz me'}
         </Button>
         <Button variant="outline" size="sm" onClick={() => setAiOpen(true)}>
           <Layers className="h-3.5 w-3.5 text-emerald-500" />Make cards
