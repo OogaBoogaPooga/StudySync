@@ -116,9 +116,20 @@ export default function Notes() {
                     <Trash2 className="h-3.5 w-3.5 text-destructive" />
                   </button>
                 </div>
-                <CardDescription className="text-xs">
-                  {cardCount(s)} card{cardCount(s) === 1 ? '' : 's'}
-                  {s.updatedAt && ` · ${format(new Date(s.updatedAt), 'MMM d')}`}
+                <CardDescription className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                  {s.class && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-foreground/80">
+                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: s.class.color }} />
+                      {s.class.name}
+                    </span>
+                  )}
+                  {s.unitName && (
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                      {s.unitName}
+                    </span>
+                  )}
+                  <span>{cardCount(s)} card{cardCount(s) === 1 ? '' : 's'}</span>
+                  {s.updatedAt && <span>· {format(new Date(s.updatedAt), 'MMM d')}</span>}
                 </CardDescription>
               </CardHeader>
               <CardContent className="pt-2">

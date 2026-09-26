@@ -5,7 +5,7 @@ import { api, generateQuiz, reviewCard } from '@/lib/api.js';
 import { useApp } from '@/lib/store.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card.jsx';
-import { Input, Textarea } from '@/components/ui/input.jsx';
+import { Input, Textarea, Select } from '@/components/ui/input.jsx';
 import { Dialog, DialogContent } from '@/components/ui/dialog.jsx';
 import CollabEditor from '@/components/CollabEditor.jsx';
 
@@ -15,18 +15,27 @@ export default function StudySet() {
   const navigate = useNavigate();
   const [quizBusy, setQuizBusy] = useState(false);
   const [set, setSet] = useState(null);
+  const [classes, setClasses] = useState([]);
   const [loadError, setLoadError] = useState('');
   const [saving, setSaving] = useState('');
   const [card, setCard] = useState({ front: '', back: '' });
   const [aiOpen, setAiOpen] = useState(false);
   const [study, setStudy] = useState(false);
+  const [metaSaving, setMetaSaving] = useState(false);
   const saveTimer = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
     setLoadError('');
-    api(`/sets/${id}`)
-      .then((data) => { if (!cancelled) setSet(data); })
+    Promise.all([
+      api(`/sets/${id}`),
+      api('/classes').catch(() => []),
+    ])
+      .then(([s, c]) => {
+        if (cancelled) return;
+        setSet(s);
+        setClasses(Array.isArray(c) ? c : []);
+      })
       .catch((e) => {
         if (cancelled) return;
         setLoadError(e.message || 'Failed to load this set');
@@ -48,6 +57,18 @@ export default function StudySet() {
       }
     }, 800);
   }, [id, toast]);
+
+  const updateMeta = async (patch) => {
+    setMetaSaving(true);
+    try {
+      const updated = await api(`/sets/${id}`, { method: 'PUT', body: patch });
+      setSet((s) => ({ ...s, ...updated }));
+    } catch (e) {
+      toast(e.message, 'error');
+    } finally {
+      setMetaSaving(false);
+    }
+  };
 
   const addCard = async (e) => {
     e.preventDefault();
@@ -119,7 +140,7 @@ export default function StudySet() {
           <input
             aria-label="Set title"
             defaultValue={set.title}
-            onBlur={(e) => e.target.value !== set.title && api(`/sets/${id}`, { method: 'PUT', body: { title: e.target.value } }).then(() => toast('Title saved')).catch((err) => toast(err.message, 'error'))}
+            onBlur={(e) => e.target.value !== set.title && updateMeta({ title: e.target.value }).then(() => toast('Title saved'))}
             className="bg-transparent text-2xl font-bold outline-none focus:border-b border-primary"
           />
         </div>
@@ -133,6 +154,35 @@ export default function StudySet() {
             <Play className="h-4 w-4" />Study {dueCount > 0 ? `(${dueCount} due)` : `(${set.cards.length})`}
           </Button>
         </div>
+      </div>
+
+      {/* Class + unit assignment row */}
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground">Class:</span>
+          <Select
+            value={set.classId || ''}
+            onChange={(e) => updateMeta({ classId: e.target.value || null })}
+            className="h-8 w-44 text-xs"
+            aria-label="Assign to class"
+          >
+            <option value="">— None —</option>
+            {classes.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </Select>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground">Unit:</span>
+          <Input
+            defaultValue={set.unitName || ''}
+            onBlur={(e) => e.target.value !== (set.unitName || '') && updateMeta({ unitName: e.target.value || null })}
+            placeholder="e.g. Chapter 5, Unit 3"
+            className="h-8 w-52 text-xs"
+            aria-label="Unit name"
+          />
+        </div>
+        {metaSaving && <span className="text-[10px] text-muted-foreground">Saving…</span>}
       </div>
 
       <div className="grid lg:grid-cols-[1fr_380px] gap-6">

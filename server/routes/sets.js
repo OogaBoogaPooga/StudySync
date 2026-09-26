@@ -118,7 +118,10 @@ function computeNextReview(card, grade, now) {
 setRoutes.get('/', wrap(async (req, res) => {
   const sets = await prisma.studySet.findMany({
     where: { userId: req.user.id },
-    include: { _count: { select: { cards: true } } },
+    include: {
+      _count: { select: { cards: true } },
+      class: { select: { id: true, name: true, color: true } },
+    },
     orderBy: { updatedAt: 'desc' },
   });
   res.json(sets);
@@ -130,15 +133,37 @@ setRoutes.post('/', validate(z.object({ title: z.string().trim().min(1).max(100)
 }));
 
 setRoutes.get('/:id', wrap(async (req, res) => {
-  const set = await prisma.studySet.findFirst({ where: { id: req.params.id, userId: req.user.id }, include: { cards: true } });
+  const set = await prisma.studySet.findFirst({
+    where: { id: req.params.id, userId: req.user.id },
+    include: {
+      cards: true,
+      class: { select: { id: true, name: true, color: true } },
+    },
+  });
   if (!set) return res.status(404).json({ error: 'Study set not found' });
   res.json(set);
 }));
 
-setRoutes.put('/:id', validate(z.object({ title: z.string().trim().min(1).max(100).optional(), content: z.string().max(200000).optional() })), wrap(async (req, res) => {
-  const result = await prisma.studySet.updateMany({ where: { id: req.params.id, userId: req.user.id }, data: req.body });
+setRoutes.put('/:id', validate(z.object({
+  title: z.string().trim().min(1).max(100).optional(),
+  content: z.string().max(200000).optional(),
+  classId: z.string().nullable().optional(),
+  unitName: z.string().trim().max(80).nullable().optional(),
+})), wrap(async (req, res) => {
+  const data = { ...req.body };
+  // Normalize empty strings to null so the relation clears cleanly
+  if (data.classId === '') data.classId = null;
+  if (data.unitName === '') data.unitName = null;
+
+  const result = await prisma.studySet.updateMany({ where: { id: req.params.id, userId: req.user.id }, data });
   if (!result.count) return res.status(404).json({ error: 'Study set not found' });
-  res.json(await prisma.studySet.findUnique({ where: { id: req.params.id } }));
+  res.json(await prisma.studySet.findUnique({
+    where: { id: req.params.id },
+    include: {
+      cards: true,
+      class: { select: { id: true, name: true, color: true } },
+    },
+  }));
 }));
 
 setRoutes.delete('/:id', wrap(async (req, res) => {
@@ -165,7 +190,6 @@ setRoutes.post('/:id/cards/bulk', validate(z.object({ cards: z.array(cardSchema)
   res.status(201).json(await prisma.flashcard.findMany({ where: { setId: req.params.id } }));
 }));
 
-// Spaced repetition — record a review and reschedule the card
 setRoutes.post('/:id/cards/:cardId/review', validate(z.object({
   grade: z.enum(['again', 'hard', 'good', 'easy']),
 })), wrap(async (req, res) => {

@@ -38,6 +38,7 @@ model Class {
   userId      String
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   assignments Assignment[]
+  studySets   StudySet[]
 
   snapshotScore     Float?
   snapshotMax       Float?
@@ -84,6 +85,10 @@ model StudySet {
   quizzes      Quiz[]
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
+
+  classId  String?
+  class    Class?  @relation(fields: [classId], references: [id], onDelete: SetNull)
+  unitName String?
 }
 
 model Flashcard {
