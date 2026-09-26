@@ -59,18 +59,14 @@ export default function NotesChat() {
     }
   }
 
-  // Keep a live reference so the event listener always uses the latest closure
   sendRef.current = sendText;
 
-  // Global opener: StudySet and other pages dispatch this to open the chat
-  // with an optional set + auto-sent prompt.
   useEffect(() => {
     const onChat = (e) => {
       const detail = e.detail || {};
       setOpen(true);
       if (detail.setId !== undefined) setSetId(detail.setId || '');
       if (detail.prompt) {
-        // Defer so setOpen and setSetId land first
         requestAnimationFrame(() => {
           sendRef.current?.(detail.prompt, detail.setId);
         });
@@ -87,7 +83,7 @@ export default function NotesChat() {
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-50 flex items-center gap-2 rounded-full border border-primary/20 bg-card px-4 py-3 text-sm font-medium text-foreground shadow-xl transition-all hover:shadow-2xl hover:-translate-y-0.5"
+          className="no-print fixed bottom-20 md:bottom-6 right-4 md:right-6 z-50 flex items-center gap-2 rounded-full border border-primary/20 bg-card px-4 py-3 text-sm font-medium text-foreground shadow-xl transition-all hover:shadow-2xl hover:-translate-y-0.5"
           aria-label="Open notes chat"
         >
           <span className="grid h-6 w-6 place-items-center rounded-full bg-primary/10">
@@ -98,7 +94,7 @@ export default function NotesChat() {
       )}
 
       {open && (
-        <div className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-50 flex h-[600px] max-h-[calc(100vh-6rem)] w-[400px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-2xl animate-fade-in">
+        <div className="no-print fixed bottom-20 md:bottom-6 right-4 md:right-6 z-50 flex h-[600px] max-h-[calc(100vh-6rem)] w-[400px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-2xl animate-fade-in">
           <div className="flex items-center justify-between border-b border-border/60 bg-card/80 px-4 py-3 backdrop-blur">
             <div className="flex items-center gap-2.5">
               <span className="grid h-7 w-7 place-items-center rounded-full bg-primary/10">
