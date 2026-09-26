@@ -653,5 +653,67 @@ router.post('/grades/scan', upload.single('file'), wrap(async (req, res) => {
 
   res.json({ classes, detected: classes.length });
 }));
+/* ---------- Paste-grades-text importer ---------- */
 
+const GRADES_TEXT_PROMPT = `You are an OCR/parser for pasted grade-portal text. The user copied rows from their school portal (Infinite Campus, PowerSchool, Canvas, Skyward, etc.).
+
+Return ONLY valid JSON:
+{
+  "classes": [
+    { "name": "string (course name)", "pct": number, "letter": "string or null" }
+  ]
+}
+
+RULES:
+- Extract every course row.
+- "name" is the course title, trimmed. Remove trailing section/room numbers if attached.
+- If the grade is a percentage like "94.27%" or "94.27", use that number.
+- If shown as a fraction like "167/174", compute (167/174)*100 rounded to 1 decimal.
+- If only a letter grade is shown, estimate using: A+=98, A=95, A-=92, B+=88, B=85, B-=82, C+=78, C=75, C-=72, D=65, F=55.
+- Ignore GPA, term averages, teacher names, room numbers, and student names. Only actual courses.
+- Dedupe: if the same course appears more than once, keep only the last occurrence.
+- Do NOT invent classes that aren't in the text.`;
+
+router.post('/grades/parse-text', validate(z.object({
+  text: z.string().trim().min(10, 'Paste at least one class line'),
+})), wrap(async (req, res) => {
+  if (!process.env.GROQ_API_KEY) {
+    return res.status(500).json({ error: 'AI is not configured on the server.' });
+  }
+
+  let raw;
+  try {
+    raw = await callAI({
+      systemPrompt: GRADES_TEXT_PROMPT,
+      userPrompt: req.body.text.slice(0, 8000),
+      jsonMode: true,
+      maxTokens: 1500,
+    });
+  } catch (e) {
+    console.error('[grades/parse-text] AI error:', e.message);
+    return res.status(502).json({ error: e.message });
+  }
+
+  let parsed;
+  try { parsed = JSON.parse(raw); }
+  catch { return res.status(502).json({ error: 'AI returned invalid JSON.' }); }
+
+  const classes = Array.isArray(parsed.classes)
+    ? parsed.classes
+        .map((c) => ({
+          name: String(c.name || '').trim().slice(0, 120),
+          pct: Number(c.pct),
+          letter: c.letter ? String(c.letter).trim().slice(0, 3) : null,
+        }))
+        .filter((c) => c.name && Number.isFinite(c.pct) && c.pct >= 0 && c.pct <= 150)
+    : [];
+
+  if (!classes.length) {
+    return res.status(422).json({
+      error: "Couldn't find any classes in that text. Make sure it includes course names and grades.",
+    });
+  }
+
+  res.json({ classes, detected: classes.length });
+}));
 export default router;
