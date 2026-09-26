@@ -6,6 +6,7 @@ import { MusicProvider } from './lib/music.jsx';
 import { TimerProvider } from './lib/timer.jsx';
 import MusicPill from './components/MusicPill.jsx';
 import TimerBadge from './components/TimerBadge.jsx';
+import InstallBanner from './components/InstallBanner.jsx';
 
 const Login = lazy(() => import('./pages/Login.jsx'));
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
@@ -54,6 +55,7 @@ export default function App() {
           </Routes>
           <MusicPill />
           <TimerBadge />
+          <InstallBanner />
         </Suspense>
       </MusicProvider>
     </TimerProvider>
