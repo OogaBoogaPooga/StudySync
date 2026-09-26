@@ -45,7 +45,7 @@ router.get('/streak', wrap(async (req, res) => {
     if (day) day.focusMin += s.durationMin;
   }
   for (const c of cards) {
-    const day = byDate.get(isoDate(c.lastReviewedAt));
+    const day = byDate.get(isoDate(c.reviewedAt || c.lastReviewedAt));
     if (day) day.cards += 1;
   }
   for (const a of assignments) {
