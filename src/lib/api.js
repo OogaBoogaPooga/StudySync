@@ -57,8 +57,8 @@ export const getQuizAttemptsBySet = (setId) => api(`/quizzes/by-set/${setId}`);
 
 // ---- Infinite Campus ----
 export const getICStatus = () => api('/ic/status');
-export const saveICCredentials = (portalUrl, username, password) =>
-  api('/ic/credentials', { method: 'POST', body: { portalUrl, username, password } });
+export const saveICCredentials = (payload) =>
+  api('/ic/credentials', { method: 'POST', body: payload });
 export const disconnectIC = () => api('/ic/credentials', { method: 'DELETE' });
 export const previewICSync = () => api('/ic/preview', { method: 'POST' });
 export const syncICGrades = () => api('/ic/sync', { method: 'POST' });
