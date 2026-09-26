@@ -1,78 +1,218 @@
-import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { X, ChevronLeft, ChevronRight, Sparkles, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button.jsx';
 import { useApp } from '@/lib/store.jsx';
 
+const TOUR_STYLE = `
+@keyframes tour-pulse {
+  0%   { transform: scale(1);     box-shadow: 0 0 0 0   hsl(var(--primary) / 0.55); }
+  45%  { transform: scale(0.96);  box-shadow: 0 0 0 8px hsl(var(--primary) / 0.28); }
+  100% { transform: scale(1);     box-shadow: 0 0 0 0   hsl(var(--primary) / 0); }
+}
+.tour-click-pulse {
+  animation: tour-pulse 520ms cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: 8px;
+}
+`;
+
 /**
- * Tour steps. Each step:
- *  - route: page to navigate to before showing the step (null = stay put)
- *  - target: CSS selector for the element to spotlight (null = centered card)
- * The tour navigates to `route`, waits up to 4s for `target` to appear, then
- * highlights it. If the target never appears, the step renders as a centered
- * card so the tour can never break on a page whose DOM changed.
+ * Tour steps.
+ *  - route:     static route to navigate to when the step activates (optional)
+ *  - navRoute:  if set, the step is a "sidebar click" step: the nav item is
+ *               highlighted, Next pulses it, then navigates here
+ *  - target:    CSS selector string OR { tag, text } to match by text content.
+ *               If null, or if nothing is found, the step is a centered card.
  */
 const STEPS = [
   {
     id: 'welcome',
     title: 'Welcome to StudySync',
-    body: "Let's take a 30-second tour. I'll walk you through each section and show you what it does. Use the arrows or ← / → keys to move.",
+    body: "Let's take a short tour. I'll visit each section and point out the features you might miss. Use ← / → to move, or click Next.",
     route: null,
     target: null,
   },
   {
-    id: 'dashboard',
-    title: 'Dashboard',
-    body: "Your home base: today's assignments, upcoming work, and quick stats at a glance.",
-    route: '/',
-    target: 'main h1',
-  },
-  {
-    id: 'calendar',
-    title: 'Calendar',
-    body: 'Every assignment laid out by due date. Add, edit, and mark things complete right from here.',
-    route: '/calendar',
-    target: 'main h1',
-  },
-  {
-    id: 'focus',
+    id: 'nav-focus',
     title: 'Focus',
-    body: 'A Pomodoro timer that keeps running as you switch pages. Study music, session notes, and your activity streak live on this screen too.',
+    body: 'First, Focus — a Pomodoro timer that keeps running even when you switch pages.',
+    target: 'aside nav a[href="/focus"]',
+    navRoute: '/focus',
+    navLabel: 'Focus',
+  },
+  {
+    id: 'focus-timer',
+    title: 'The Pomodoro timer',
+    body: 'Start, pause, or reset from here. The gear icon at the top customizes your focus / short break / long break durations. Below the timer, session notes auto-save and attach to your session when the round finishes.',
     route: '/focus',
-    target: 'main .grid',
+    target: '[role="timer"]',
   },
   {
-    id: 'notes',
+    id: 'nav-notes',
     title: 'Notes',
-    body: 'Rich-text notes that turn into flashcards, quizzes, and AI study sets. Upload a PDF or paste text and AI writes the notes for you.',
+    body: 'Next up: Notes — where AI turns your sources into study material.',
+    target: 'aside nav a[href="/notes"]',
+    navRoute: '/notes',
+    navLabel: 'Notes',
+  },
+  {
+    id: 'notes-actions',
+    title: 'Create study sets',
+    body: 'Two ways to start: "New set" for a blank one, or "AI notes" to paste text or upload a PDF / DOCX and have AI write the notes for you.',
     route: '/notes',
-    target: 'main h1',
+    target: { tag: 'button', text: 'AI notes' },
   },
   {
-    id: 'grades',
+    id: 'nav-grades',
     title: 'Grades',
-    body: 'Paste grades from your school portal and StudySync tracks them. GPA, per-class breakdown, what-if scenarios — all here.',
-    route: '/grades',
-    target: 'main h1',
+    body: 'Now Grades — where you track your GPA and import your report card.',
+    target: 'aside nav a[href="/grades"]',
+    navRoute: '/grades',
+    navLabel: 'Grades',
   },
   {
-    id: 'rooms',
+    id: 'grades-import',
+    title: 'Import your grades',
+    body: 'Copy the grade list from your school portal (Infinite Campus, PowerSchool, etc.), click here, and paste. AI parses it into classes with correct percentages, and your GPA updates automatically.',
+    route: '/grades',
+    target: { tag: 'button', text: 'Import grades' },
+  },
+  {
+    id: 'nav-dashboard',
+    title: 'Dashboard',
+    body: 'Dashboard is your overview page.',
+    target: 'aside nav a[href="/"]',
+    navRoute: '/',
+    navLabel: 'Dashboard',
+  },
+  {
+    id: 'dashboard-main',
+    title: 'At a glance',
+    body: "Assignments, progress, and everything due soon. Add assignments here and they'll show up on your Calendar.",
+    route: '/',
+    target: 'main',
+  },
+  {
+    id: 'nav-calendar',
+    title: 'Calendar',
+    body: 'Calendar shows your assignments by due date.',
+    target: 'aside nav a[href="/calendar"]',
+    navRoute: '/calendar',
+    navLabel: 'Calendar',
+  },
+  {
+    id: 'calendar-main',
+    title: 'Plan your week',
+    body: 'Every assignment on the day it is due. Click any to edit, mark complete, or see details.',
+    route: '/calendar',
+    target: 'main',
+  },
+  {
+    id: 'nav-rooms',
     title: 'Study Rooms',
-    body: 'Real-time collaborative study rooms. Shared whiteboard, chat, polls, and synced note editing with anyone who has the room code.',
+    body: 'Last section: Rooms — real-time collaborative study with friends.',
+    target: 'aside nav a[href="/rooms"]',
+    navRoute: '/rooms',
+    navLabel: 'Rooms',
+  },
+  {
+    id: 'rooms-main',
+    title: 'Study together',
+    body: 'Create a room, share the code, and you get a shared whiteboard, chat, polls, and synced note editing. Everyone sees changes instantly.',
     route: '/rooms',
-    target: 'main h1',
+    target: 'main',
   },
   {
     id: 'done',
-    title: "You're all set",
-    body: "That's the tour. Two things you might miss: the music player pill at the bottom center, and the 'Ask my notes' AI chat at bottom right. Replay this tour any time from the help icon in the sidebar.",
+    title: "That's the tour",
+    body: "Two things you might miss: the music player pill at the bottom-center of the screen (25 lo-fi tracks), and the 'Ask my notes' AI chat at bottom-right — it answers questions using only YOUR notes. Replay this tour anytime from the help icon in the sidebar.",
     route: null,
     target: null,
   },
 ];
 
 const TOUR_KEY = 'studysync_tour_done_v1';
-const WAIT_TIMEOUT_MS = 4000;
+const WAIT_TIMEOUT_MS = 5000;
+const PAD = 6;
+const TOOLTIP_W = 340;
+const TOOLTIP_H = 210;
+
+function findTargetEl(target) {
+  if (!target) return null;
+  if (typeof target === 'string') {
+    const els = document.querySelectorAll(target);
+    for (const el of els) {
+      const r = el.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) return el;
+    }
+    return null;
+  }
+  if (target.tag && target.text) {
+    const els = document.querySelectorAll(target.tag);
+    for (const el of els) {
+      if (el.textContent && el.textContent.includes(target.text)) {
+        const r = el.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) return el;
+      }
+    }
+  }
+  return null;
+}
+
+function computeTooltipPosition(rect) {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const gap = 16;
+  const margin = 16;
+
+  const fits = {
+    below: rect.top + rect.height + gap + TOOLTIP_H <= vh - margin,
+    above: rect.top - gap - TOOLTIP_H >= margin,
+    right: rect.left + rect.width + gap + TOOLTIP_W <= vw - margin,
+    left: rect.left - gap - TOOLTIP_W >= margin,
+  };
+
+  // WIDE targets (like <main>) → always go below or above
+  // TALL targets (like <aside>) → always go left or right
+  // Small targets → try below, right, above, left
+  let side;
+  if (rect.width > vw * 0.65) {
+    side = fits.below ? 'below' : fits.above ? 'above' : 'below';
+  } else if (rect.height > vh * 0.5) {
+    side = fits.right ? 'right' : fits.left ? 'left' : 'below';
+  } else {
+    side = fits.below ? 'below'
+         : fits.right ? 'right'
+         : fits.above ? 'above'
+         : fits.left ? 'left'
+         : 'below';
+  }
+
+  let left, top;
+  switch (side) {
+    case 'below':
+      top = rect.top + rect.height + gap;
+      left = rect.left + rect.width / 2 - TOOLTIP_W / 2;
+      break;
+    case 'above':
+      top = rect.top - gap - TOOLTIP_H;
+      left = rect.left + rect.width / 2 - TOOLTIP_W / 2;
+      break;
+    case 'right':
+      left = rect.left + rect.width + gap;
+      top = rect.top + rect.height / 2 - TOOLTIP_H / 2;
+      break;
+    case 'left':
+    default:
+      left = rect.left - gap - TOOLTIP_W;
+      top = rect.top + rect.height / 2 - TOOLTIP_H / 2;
+      break;
+  }
+
+  left = Math.max(margin, Math.min(left, vw - TOOLTIP_W - margin));
+  top = Math.max(margin, Math.min(top, vh - TOOLTIP_H - margin));
+  return { left, top };
+}
 
 export default function Tour() {
   const { user } = useApp();
@@ -82,6 +222,7 @@ export default function Tour() {
   const [stepIndex, setStepIndex] = useState(-1);
   const [rect, setRect] = useState(null);
   const [waiting, setWaiting] = useState(false);
+  const pulseLock = useRef(false);
 
   const active = stepIndex >= 0 && stepIndex < STEPS.length;
   const step = active ? STEPS[stepIndex] : null;
@@ -111,28 +252,28 @@ export default function Tour() {
     return () => clearTimeout(t);
   }, [user]);
 
-  // Restart via global event (from the help icon)
+  // Restart via global event
   useEffect(() => {
     const onStart = () => start();
     window.addEventListener('studysync:startTour', onStart);
     return () => window.removeEventListener('studysync:startTour', onStart);
   }, [start]);
 
-  // Navigate when the step changes
+  // If the step has a static route and we're not there yet, navigate
   useEffect(() => {
     if (!step || !step.route) return;
     if (location.pathname === step.route) return;
     navigate(step.route);
   }, [step, navigate, location.pathname]);
 
-  // Reset rect/waiting whenever the step changes so we don't paint stale highlights
+  // Reset measurement state on step change
   useEffect(() => {
     setRect(null);
     setWaiting(!!(step && step.target));
-  }, [stepIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stepIndex]);
 
-  // Poll for the target element. Gives up after WAIT_TIMEOUT_MS; the step
-  // then falls back to a centered card.
+  // Poll for the target element
   useLayoutEffect(() => {
     if (!step) return;
     if (!step.target) {
@@ -142,32 +283,32 @@ export default function Tour() {
     }
 
     let cancelled = false;
-    const startTime = Date.now();
+    const startedAt = Date.now();
     let intervalId;
 
     const measure = () => {
       if (cancelled) return;
-      const els = document.querySelectorAll(step.target);
-      let found = null;
-      for (const el of els) {
+      const el = findTargetEl(step.target);
+      if (el) {
         const r = el.getBoundingClientRect();
-        if (r.width > 0 && r.height > 0) { found = r; break; }
-      }
-      if (found) {
-        setRect({ top: found.top, left: found.left, width: found.width, height: found.height });
+        setRect({
+          top: r.top - PAD,
+          left: r.left - PAD,
+          width: r.width + PAD * 2,
+          height: r.height + PAD * 2,
+        });
         setWaiting(false);
         clearInterval(intervalId);
         return;
       }
-      if (Date.now() - startTime > WAIT_TIMEOUT_MS) {
-        // Give up — the step will render as a centered card
+      if (Date.now() - startedAt > WAIT_TIMEOUT_MS) {
         setWaiting(false);
         clearInterval(intervalId);
       }
     };
 
     measure();
-    intervalId = setInterval(measure, 200);
+    intervalId = setInterval(measure, 150);
 
     window.addEventListener('resize', measure);
     window.addEventListener('scroll', measure, true);
@@ -179,69 +320,107 @@ export default function Tour() {
     };
   }, [step]);
 
-  // Keyboard shortcuts
+  // Navigation between steps
+  const goNext = useCallback(() => {
+    if (!step) return;
+    if (step.navRoute) {
+      // Sidebar-click simulation: pulse the nav item, then navigate + advance
+      if (pulseLock.current) return;
+      pulseLock.current = true;
+      const el = findTargetEl(step.target);
+      if (el) {
+        el.classList.add('tour-click-pulse');
+        setTimeout(() => el.classList.remove('tour-click-pulse'), 520);
+      }
+      setTimeout(() => {
+        navigate(step.navRoute);
+        setStepIndex((i) => Math.min(i + 1, STEPS.length - 1));
+        pulseLock.current = false;
+      }, 300);
+    } else {
+      setStepIndex((i) => Math.min(i + 1, STEPS.length - 1));
+    }
+  }, [step, navigate]);
+
+  const goPrev = useCallback(() => {
+    setStepIndex((i) => Math.max(i - 1, 0));
+  }, []);
+
+  // Keep a live ref for the keydown handler
+  const goNextRef = useRef(goNext);
+  const goPrevRef = useRef(goPrev);
+  const closeRef = useRef(close);
+  goNextRef.current = goNext;
+  goPrevRef.current = goPrev;
+  closeRef.current = close;
+
   useEffect(() => {
     if (!active) return;
     const onKey = (e) => {
-      if (e.key === 'Escape') close();
-      if (e.key === 'ArrowRight') setStepIndex((i) => Math.min(i + 1, STEPS.length - 1));
-      if (e.key === 'ArrowLeft') setStepIndex((i) => Math.max(i - 1, 0));
+      if (e.key === 'Escape') closeRef.current();
+      if (e.key === 'ArrowRight') goNextRef.current();
+      if (e.key === 'ArrowLeft') goPrevRef.current();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [active, close]);
+  }, [active]);
 
   if (!active) return null;
 
   const isFirst = stepIndex === 0;
   const isLast = stepIndex === STEPS.length - 1;
-  const next = () => setStepIndex((i) => Math.min(i + 1, STEPS.length - 1));
-  const prev = () => setStepIndex((i) => Math.max(i - 1, 0));
 
-  const common = {
-    step,
-    isFirst,
-    isLast,
-    index: stepIndex,
-    total: STEPS.length,
-    onPrev: prev,
-    onNext: next,
-    onClose: close,
-  };
-
-  // Waiting for the target to load — show a small "Loading" tooltip
-  if (waiting && !rect) {
-    return <LoadingCard step={step} onClose={close} />;
-  }
-
-  // Spotlight + tooltip
-  if (rect) {
-    return (
-      <>
-        <div
-          className="fixed z-[80] rounded-lg transition-all duration-200"
-          style={{
-            top: rect.top - 4,
-            left: rect.left - 4,
-            width: rect.width + 8,
-            height: rect.height + 8,
-            boxShadow: '0 0 0 9999px rgba(0,0,0,0.6)',
-            outline: '2px solid hsl(var(--primary))',
-            outlineOffset: 0,
-          }}
-          onClick={close}
-          aria-hidden="true"
-        />
-        <TooltipNearRect rect={rect} {...common} />
-      </>
-    );
-  }
-
-  // Centered fallback
   return (
     <>
-      <div className="fixed inset-0 z-[80] bg-black/60" onClick={close} />
-      <CenteredCard {...common} />
+      <style>{TOUR_STYLE}</style>
+
+      {waiting && !rect && <LoadingCard step={step} onClose={close} />}
+
+      {!waiting && rect && (
+        <>
+          <div
+            className="fixed z-[80] rounded-lg transition-all duration-200"
+            style={{
+              top: rect.top,
+              left: rect.left,
+              width: rect.width,
+              height: rect.height,
+              boxShadow: '0 0 0 9999px rgba(0,0,0,0.62)',
+              outline: '2px solid hsl(var(--primary))',
+              outlineOffset: 0,
+            }}
+            onClick={close}
+            aria-hidden="true"
+          />
+          <Tooltip
+            rect={rect}
+            step={step}
+            isFirst={isFirst}
+            isLast={isLast}
+            index={stepIndex}
+            total={STEPS.length}
+            onPrev={goPrev}
+            onNext={goNext}
+            onClose={close}
+          />
+        </>
+      )}
+
+      {!waiting && !rect && (
+        <>
+          <div className="fixed inset-0 z-[80] bg-black/62" onClick={close} />
+          <CenteredCard
+            step={step}
+            isFirst={isFirst}
+            isLast={isLast}
+            index={stepIndex}
+            total={STEPS.length}
+            onPrev={goPrev}
+            onNext={goNext}
+            onClose={close}
+          />
+        </>
+      )}
     </>
   );
 }
@@ -249,7 +428,7 @@ export default function Tour() {
 function LoadingCard({ step, onClose }) {
   return (
     <>
-      <div className="fixed inset-0 z-[80] bg-black/60" />
+      <div className="fixed inset-0 z-[80] bg-black/62" />
       <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
         <div className="flex items-center gap-3 rounded-2xl border bg-card px-5 py-4 shadow-2xl">
           <Loader2 className="h-4 w-4 animate-spin text-primary" />
@@ -263,41 +442,19 @@ function LoadingCard({ step, onClose }) {
   );
 }
 
-function TooltipNearRect({ rect, step, isFirst, isLast, index, total, onPrev, onNext, onClose }) {
-  const W = 340;
-  const H = 200;
-  const gap = 14;
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-
-  let left;
-  if (rect.left > vw * 0.6) {
-    left = rect.left - W - gap;
-  } else if (rect.left + rect.width + gap + W <= vw - 16) {
-    left = rect.left + rect.width + gap;
-  } else {
-    left = Math.max(16, (vw - W) / 2);
-  }
-
-  let top;
-  if (rect.top > vh * 0.55) {
-    top = rect.top - H - gap;
-  } else {
-    top = rect.top + rect.height / 2 - H / 2;
-  }
-
-  left = Math.max(16, Math.min(left, vw - W - 16));
-  top = Math.max(16, Math.min(top, vh - H - 16));
+function Tooltip({ rect, step, isFirst, isLast, index, total, onPrev, onNext, onClose }) {
+  const { left, top } = computeTooltipPosition(rect);
+  const isNavStep = !!step.navRoute;
 
   return (
     <div
-      className="fixed z-[90] w-[340px] rounded-xl border bg-card p-4 shadow-2xl"
-      style={{ top, left }}
+      className="fixed z-[90] rounded-xl border bg-card p-4 shadow-2xl"
+      style={{ top, left, width: TOOLTIP_W }}
       role="dialog"
       aria-label={step.title}
     >
-      <div className="mb-1 flex items-center gap-2">
-        <span className="grid h-6 w-6 place-items-center rounded-full bg-primary/10">
+      <div className="mb-1.5 flex items-center gap-2">
+        <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-primary/10">
           <Sparkles className="h-3.5 w-3.5 text-primary" />
         </span>
         <p className="text-sm font-semibold">{step.title}</p>
@@ -306,7 +463,7 @@ function TooltipNearRect({ rect, step, isFirst, isLast, index, total, onPrev, on
       <div className="mt-3 flex items-center justify-between border-t pt-3">
         <div className="flex items-center gap-2">
           <button onClick={onClose} className="text-[11px] text-muted-foreground hover:text-foreground">
-            Skip
+            Skip tour
           </button>
           <span className="text-[10px] text-muted-foreground">{index + 1} / {total}</span>
         </div>
@@ -318,8 +475,14 @@ function TooltipNearRect({ rect, step, isFirst, isLast, index, total, onPrev, on
           )}
           {isLast ? (
             <Button variant="gradient" size="sm" onClick={onClose}>Done</Button>
+          ) : isNavStep ? (
+            <Button variant="gradient" size="sm" onClick={onNext}>
+              Go to {step.navLabel}
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Button>
           ) : (
             <Button variant="gradient" size="sm" onClick={onNext} aria-label="Next step">
+              Next
               <ChevronRight className="h-3.5 w-3.5" />
             </Button>
           )}
