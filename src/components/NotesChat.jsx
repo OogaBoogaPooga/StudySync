@@ -8,6 +8,19 @@ const SUGGESTIONS = [
   'Quiz me on the key terms',
 ];
 
+function renderMarkdown(text) {
+  let html = String(text || '');
+  html = html
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  html = html.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>');
+  html = html.replace(/\s*\[\d+(?:\s*,\s*\d+)*\]/g, '');
+  html = html.replace(/\n/g, '<br>');
+  return html;
+}
+
 export default function NotesChat() {
   const [open, setOpen] = useState(false);
   const [sets, setSets] = useState([]);
@@ -16,6 +29,7 @@ export default function NotesChat() {
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef(null);
+  const sendRef = useRef(null);
 
   useEffect(() => {
     if (!open || sets.length) return;
@@ -28,14 +42,15 @@ export default function NotesChat() {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, open, busy]);
 
-  async function sendText(raw) {
-    const text = raw.trim();
+  async function sendText(raw, overrideSetId) {
+    const text = String(raw || '').trim();
     if (!text || busy) return;
+    const sid = overrideSetId !== undefined ? overrideSetId : setId;
     setInput('');
     setMessages((m) => [...m, { role: 'user', content: text }]);
     setBusy(true);
     try {
-      const res = await chatWithNotes(text, setId || null);
+      const res = await chatWithNotes(text, sid || null);
       setMessages((m) => [...m, { role: 'assistant', content: res.reply }]);
     } catch (err) {
       setMessages((m) => [...m, { role: 'assistant', content: 'Something went wrong. Try again in a moment.' }]);
@@ -43,6 +58,27 @@ export default function NotesChat() {
       setBusy(false);
     }
   }
+
+  // Keep a live reference so the event listener always uses the latest closure
+  sendRef.current = sendText;
+
+  // Global opener: StudySet and other pages dispatch this to open the chat
+  // with an optional set + auto-sent prompt.
+  useEffect(() => {
+    const onChat = (e) => {
+      const detail = e.detail || {};
+      setOpen(true);
+      if (detail.setId !== undefined) setSetId(detail.setId || '');
+      if (detail.prompt) {
+        // Defer so setOpen and setSetId land first
+        requestAnimationFrame(() => {
+          sendRef.current?.(detail.prompt, detail.setId);
+        });
+      }
+    };
+    window.addEventListener('studysync:chat', onChat);
+    return () => window.removeEventListener('studysync:chat', onChat);
+  }, []);
 
   const send = () => sendText(input);
 
@@ -104,7 +140,7 @@ export default function NotesChat() {
                 </span>
                 <p className="text-sm font-medium">Ask anything in your notes.</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  I'll answer using only your study sets, with citations.
+                  I'll answer using only your study sets.
                 </p>
                 <div className="mt-5 flex flex-col gap-1.5 w-full">
                   {SUGGESTIONS.map((s) => (
@@ -123,15 +159,16 @@ export default function NotesChat() {
             <div className="space-y-3">
               {messages.map((m, i) => (
                 <div key={i} className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
-                  <div
-                    className={
-                      m.role === 'user'
-                        ? 'max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-primary px-3.5 py-2 text-sm leading-relaxed text-primary-foreground shadow-sm'
-                        : 'max-w-[90%] whitespace-pre-wrap rounded-2xl rounded-bl-md border border-border/60 bg-background px-3.5 py-2 text-sm leading-relaxed text-foreground'
-                    }
-                  >
-                    {m.content}
-                  </div>
+                  {m.role === 'user' ? (
+                    <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-primary px-3.5 py-2 text-sm leading-relaxed text-primary-foreground shadow-sm">
+                      {m.content}
+                    </div>
+                  ) : (
+                    <div
+                      className="max-w-[90%] rounded-2xl rounded-bl-md border border-border/60 bg-background px-3.5 py-2 text-sm leading-relaxed text-foreground [&_strong]:font-semibold"
+                      dangerouslySetInnerHTML={{ __html: renderMarkdown(m.content) }}
+                    />
+                  )}
                 </div>
               ))}
 

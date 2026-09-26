@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Sparkles, Share2, Plus, Trash2, ArrowLeft, Play, Clock } from 'lucide-react';
+import { Sparkles, Share2, Plus, Trash2, ArrowLeft, Play, Clock, HelpCircle, Layers, PenLine } from 'lucide-react';
 import { api, generateQuiz, reviewCard } from '@/lib/api.js';
 import { useApp } from '@/lib/store.jsx';
 import { Button } from '@/components/ui/button.jsx';
@@ -68,6 +68,19 @@ export default function StudySet() {
     } finally {
       setMetaSaving(false);
     }
+  };
+
+  // Fire the global chat opener with a scoped prompt
+  const askAI = (kind) => {
+    const title = set?.title || 'this set';
+    const prompts = {
+      Explain: `Explain the key ideas in the set "${title}" in 2-3 short paragraphs, using only the notes.`,
+      Quiz: `Quiz me on the set "${title}". Ask 5 questions one at a time and wait for my answer before revealing the correct one.`,
+      Practice: `Give me 3 practice problems based on the set "${title}", then show the answers at the end.`,
+    };
+    window.dispatchEvent(new CustomEvent('studysync:chat', {
+      detail: { setId: id, prompt: prompts[kind] },
+    }));
   };
 
   const addCard = async (e) => {
@@ -183,6 +196,23 @@ export default function StudySet() {
           />
         </div>
         {metaSaving && <span className="text-[10px] text-muted-foreground">Saving…</span>}
+      </div>
+
+      {/* AI tutor actions */}
+      <div className="flex flex-wrap gap-2 rounded-lg border bg-card/40 p-2">
+        <span className="self-center px-2 text-[11px] uppercase tracking-wide text-muted-foreground">AI tutor</span>
+        <Button variant="outline" size="sm" onClick={() => askAI('Explain')}>
+          <Sparkles className="h-3.5 w-3.5 text-violet-500" />Explain
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => askAI('Quiz')}>
+          <HelpCircle className="h-3.5 w-3.5 text-sky-500" />Quiz me
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => setAiOpen(true)}>
+          <Layers className="h-3.5 w-3.5 text-emerald-500" />Make cards
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => askAI('Practice')}>
+          <PenLine className="h-3.5 w-3.5 text-amber-500" />Practice problems
+        </Button>
       </div>
 
       <div className="grid lg:grid-cols-[1fr_380px] gap-6">
