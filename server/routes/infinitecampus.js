@@ -127,8 +127,9 @@ async function login(base, app, username, password) {
 }
 
 async function fetchIC(base, app, path, cookieHeader, xsrf) {
-  const sep = path.includes('?') ? '&' : '?';
-  const url = `${base}${path}${sep}appName=${app}`;
+  // Resource endpoints (/campus/resources/*) don't accept appName — appending it 404s.
+  const isResource = path.includes('/resources/');
+  const url = isResource ? `${base}${path}` : `${base}${path}${path.includes('?') ? '&' : '?'}appName=${app}`;
   const headers = {
     'Cookie': cookieHeader,
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
