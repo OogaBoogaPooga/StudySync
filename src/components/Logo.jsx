@@ -5,9 +5,9 @@ const LS_KEY = 'studysync_quokka';
 const CLICK_WINDOW_MS = 1500;
 
 /**
- * StudySync logo.
+ * StudySync logo — small tile with the mark, text to the right.
  *
- * Easter egg: click three times within 1.5s to swap to a quokka.
+ * Easter egg: click the tile three times within 1.5s to swap to a quokka.
  * Three more clicks revert. Persists via localStorage.
  */
 export default function Logo({ size = 'md', className }) {
@@ -28,26 +28,37 @@ export default function Logo({ size = 'md', className }) {
     }
   };
 
-  const sizeMap = {
-    sm: 'h-9',
-    md: 'h-14',
-    lg: 'h-24',
-  };
-  const h = sizeMap[size] || sizeMap.md;
+  const tileSize =
+    size === 'sm' ? 'h-8 w-8 rounded-lg' :
+    size === 'lg' ? 'h-12 w-12 rounded-2xl' :
+    'h-9 w-9 rounded-xl';
+
+  const textSize =
+    size === 'sm' ? 'text-base' :
+    size === 'lg' ? 'text-2xl' :
+    'text-lg';
 
   return (
     <button
       type="button"
       onClick={handleClick}
-      className={cn('inline-flex items-center select-none focus:outline-none', className)}
+      className={cn('flex items-center gap-2 select-none focus:outline-none', className)}
       aria-label="StudySync"
       title="StudySync"
     >
-      <img
-        src={quokka ? '/quokka.jpg' : '/logo.png'}
-        alt="StudySync"
-        className={cn('w-auto object-contain', h)}
-      />
+      <span
+        className={cn(
+          'relative grid shrink-0 place-items-center overflow-hidden shadow-md ring-1 ring-inset ring-white/20',
+          tileSize
+        )}
+      >
+        <img
+          src={quokka ? '/quokka.jpg' : '/logo.png'}
+          alt=""
+          className="h-full w-full object-contain"
+        />
+      </span>
+      <span className={cn('font-bold gradient-text', textSize)}>StudySync</span>
     </button>
   );
 }
