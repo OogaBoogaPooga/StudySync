@@ -5,9 +5,12 @@ const LS_KEY = 'studysync_quokka';
 const CLICK_WINDOW_MS = 1500;
 
 /**
- * StudySync mark. Hand-drawn geometric "S" monogram, single unbroken stroke.
- * Hidden easter egg: click the tile three times within 1.5s to swap the mark
- * for a quokka. Three more clicks revert. Choice persists via localStorage.
+ * StudySync logo. Uses the hand-drawn book + pencil illustration.
+ *
+ * Easter egg: click three times within 1.5s to swap to a quokka.
+ * Three more clicks revert. Persists via localStorage.
+ *
+ * Dark mode: the illustration is auto-inverted so black strokes stay visible.
  */
 export default function Logo({ size = 'md', className }) {
   const [quokka, setQuokka] = useState(() => {
@@ -27,55 +30,32 @@ export default function Logo({ size = 'md', className }) {
     }
   };
 
-  const tileSize = size === 'sm' ? 'h-8 w-8 rounded-lg' : size === 'lg' ? 'h-12 w-12 rounded-2xl' : 'h-9 w-9 rounded-xl';
-  const textSize = size === 'sm' ? 'text-base' : size === 'lg' ? 'text-2xl' : 'text-lg';
+  const sizeMap = {
+    sm: 'h-9',
+    md: 'h-14',
+    lg: 'h-24',
+  };
+  const h = sizeMap[size] || sizeMap.md;
 
   return (
     <button
       type="button"
       onClick={handleClick}
-      className={cn('flex items-center gap-2 select-none focus:outline-none', className)}
+      className={cn('inline-flex items-center select-none focus:outline-none', className)}
       aria-label="StudySync"
       title="StudySync"
     >
-      <span
-        className={cn(
-          'relative grid place-items-center overflow-hidden shadow-md ring-1 ring-inset ring-white/20',
-          tileSize,
-          quokka ? 'bg-card' : 'bg-gradient-to-br from-primary to-primary/75'
-        )}
-      >
-        {quokka ? (
+      {quokka ? (
+        <span className={cn('grid aspect-square place-items-center overflow-hidden rounded-xl ring-1 ring-inset ring-white/20 shadow-md bg-card', h)}>
           <img src="/quokka.jpg" alt="" className="h-full w-full object-cover" />
-        ) : (
-          <Mark className={size === 'sm' ? 'h-4 w-4' : size === 'lg' ? 'h-6 w-6' : 'h-5 w-5'} />
-        )}
-      </span>
-      <span className={cn('font-bold gradient-text', textSize)}>StudySync</span>
+        </span>
+      ) : (
+        <img
+          src="/logo.png"
+          alt="StudySync"
+          className={cn('w-auto object-contain dark:invert', h)}
+        />
+      )}
     </button>
-  );
-}
-
-/**
- * The mark: a single unbroken line that traces an "S".
- * Six control points, three bezier segments, 3.5px stroke, round caps.
- * Reads as a letterform at any size, from 16px favicon up to 200px hero.
- */
-function Mark({ className }) {
-  return (
-    <svg
-      viewBox="0 0 32 32"
-      fill="none"
-      className={className}
-      aria-hidden="true"
-    >
-      <path
-        d="M22 10.5 C 18 6.5, 10 7, 10 12 C 10 16.5, 22 15, 22 20 C 22 24.5, 14 25.5, 10 21.5"
-        stroke="hsl(var(--primary-foreground))"
-        strokeWidth="3.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
   );
 }
