@@ -49,7 +49,11 @@ export default function Logo({ size = 'md', className }) {
         <img
           src={quokka ? '/quokka.jpg' : '/logo.png'}
           alt=""
-          className="h-full w-full object-contain"
+          className={cn(
+            'h-full w-full',
+            // Quokka: fill the tile (crop if needed). Logo: fit entirely inside.
+            quokka ? 'object-cover' : 'object-contain'
+          )}
         />
       </span>
       <span className={cn('font-bold gradient-text', textSize)}>StudySync</span>
