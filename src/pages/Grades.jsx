@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
-import { Printer, Calculator, Pencil, Trash2 } from 'lucide-react';
+import { Printer, Calculator, Pencil, Trash2, Camera } from 'lucide-react';
 import { api, updateClass } from '@/lib/api.js';
 import { useApp } from '@/lib/store.jsx';
 import { computeGPA, classStats } from '@/lib/grades.js';
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button.jsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card.jsx';
 import { Input, Label, Select } from '@/components/ui/input.jsx';
 import { Dialog, DialogContent } from '@/components/ui/dialog.jsx';
+import ScreenshotImportDialog from '@/components/ScreenshotImportDialog.jsx';
 
 ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
@@ -18,6 +19,7 @@ export default function Grades() {
   const [assignments, setAssignments] = useState([]);
   const [whatIf, setWhatIf] = useState({ classId: '', score: 90, maxScore: 100, weight: 1 });
   const [snapshotFor, setSnapshotFor] = useState(null);
+  const [scanOpen, setScanOpen] = useState(false);
 
   const loadAll = () =>
     Promise.all([api('/classes'), api('/assignments')])
@@ -116,18 +118,29 @@ export default function Grades() {
     } catch (e) { toast(e.message, 'error'); }
   };
 
+  const sourceLabel = (src) => {
+    if (src === 'screenshot') return 'Screenshot';
+    if (src === 'infinitecampus') return 'IC';
+    return 'Manual';
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-2xl font-bold">Grades & GPA</h1>
           <p className="text-sm text-muted-foreground">
-            Click the pencil next to any class to enter a current grade from your school portal.
+            Import your grades from a screenshot, or edit any class manually with the pencil icon.
           </p>
         </div>
-        <Button variant="outline" onClick={() => window.print()} className="no-print">
-          <Printer className="h-4 w-4" />Export PDF
-        </Button>
+        <div className="flex gap-2 no-print">
+          <Button variant="outline" onClick={() => setScanOpen(true)}>
+            <Camera className="h-4 w-4" />Import from screenshot
+          </Button>
+          <Button variant="outline" onClick={() => window.print()}>
+            <Printer className="h-4 w-4" />Export PDF
+          </Button>
+        </div>
       </div>
 
       <div className="grid md:grid-cols-3 gap-4">
@@ -141,7 +154,7 @@ export default function Grades() {
         <Card className="md:col-span-2">
           <CardHeader><CardTitle>Performance by class</CardTitle></CardHeader>
           <CardContent className="h-48">
-            {graded.length ? <Bar data={barData} options={{ maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { min: 0, max: 100 } } }} /> : <p className="text-sm text-muted-foreground">No graded assignments yet.</p>}
+            {graded.length ? <Bar data={barData} options={{ maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { min: 0, max: 100 } } }} /> : <p className="text-sm text-muted-foreground">No graded classes yet. Import from a screenshot to get started.</p>}
           </CardContent>
         </Card>
       </div>
@@ -175,7 +188,7 @@ export default function Grades() {
                             className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary"
                             title={cls.snapshotUpdatedAt ? `Updated ${new Date(cls.snapshotUpdatedAt).toLocaleDateString()}` : ''}
                           >
-                            Manual
+                            {sourceLabel(cls.snapshotSource)}
                           </span>
                         )}
                       </td>
@@ -248,6 +261,12 @@ export default function Grades() {
         </div>
       </div>
 
+      <ScreenshotImportDialog
+        open={scanOpen}
+        onClose={() => setScanOpen(false)}
+        existingClasses={classes}
+        onImported={loadAll}
+      />
       <SnapshotDialog
         cls={snapshotFor}
         onClose={() => setSnapshotFor(null)}
