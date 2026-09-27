@@ -41,8 +41,8 @@ export async function api(path, { method = 'GET', body } = {}) {
 }
 
 // ---- AI chat ----
-export const chatWithNotes = (message, setId = null) =>
-  api('/ai/chat', { method: 'POST', body: { message, setId } });
+export const chatWithNotes = (message, setId = null, options = {}) =>
+  api('/ai/chat', { method: 'POST', body: { message, setId, ...options } });
 
 // ---- Quizzes ----
 export const generateQuiz = (setId, count = 10, types = ['mcq', 'short']) =>
