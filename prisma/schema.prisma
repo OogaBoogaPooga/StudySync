@@ -56,11 +56,14 @@ model Assignment {
   score       Float?
   maxScore    Float    @default(100)
   weight      Float    @default(1)
+  type        String?
   classId     String?
   class       Class?   @relation(fields: [classId], references: [id], onDelete: SetNull)
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
+  aiAnalysis  String?
+  rubricText  String?
 }
 
 model StudySession {
