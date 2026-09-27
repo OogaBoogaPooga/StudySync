@@ -8,6 +8,7 @@ import { useApp } from '@/lib/store.jsx';
 import { useMusic } from '@/lib/music.jsx';
 import { useTimer } from '@/lib/timer.jsx';
 import MusicSidebar from '@/components/MusicSidebar.jsx';
+import StreakCard from '@/components/StreakCard.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card.jsx';
 import { Input, Textarea } from '@/components/ui/input.jsx';
@@ -146,6 +147,7 @@ export default function Focus() {
       </div>
 
       <div className="space-y-6">
+        <StreakCard />
         <MusicSidebar />
 
         <Card>
