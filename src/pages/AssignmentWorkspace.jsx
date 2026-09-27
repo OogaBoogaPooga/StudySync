@@ -163,46 +163,46 @@ export default function AssignmentWorkspace() {
         <ArrowLeft className="h-4 w-4" />Dashboard
       </Link>
 
-      <div className="grid gap-4 lg:grid-cols-[280px_1fr_360px]">
-        {/* Left: assignment details */}
-        <div className="space-y-3">
-          <Card>
-            <CardContent className="p-4 space-y-3">
-              {cls && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-medium">
-                  <span className="h-2 w-2 rounded-full" style={{ background: cls.color }} />
-                  {cls.name}
-                </span>
-              )}
-              <h1 className="text-lg font-bold leading-tight">{assignment.title}</h1>
-              <p className="text-xs text-muted-foreground">{dueLabel}</p>
-
-              {assignment.weight > 1 && (
-                <span className="inline-block rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
-                  ×{assignment.weight} weight
-                </span>
-              )}
-
-              {assignment.description && (
-                <p className="whitespace-pre-wrap text-sm leading-relaxed">{assignment.description}</p>
-              )}
-            </CardContent>
-          </Card>
-
-          <div className="grid grid-cols-2 gap-2">
-            <Button variant="gradient" size="sm" onClick={markComplete} disabled={assignment.completed}>
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              {assignment.completed ? 'Done' : 'Complete'}
-            </Button>
-            <Button variant="outline" size="sm" onClick={startFocus}>
-              <Flame className="h-3.5 w-3.5" />
-              Focus
-            </Button>
+      {/* Header card */}
+      <Card>
+        <CardContent className="flex flex-wrap items-center gap-3 p-4">
+          {cls && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-medium">
+              <span className="h-2 w-2 rounded-full" style={{ background: cls.color }} />
+              {cls.name}
+            </span>
+          )}
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-xl font-bold leading-tight">{assignment.title}</h1>
+            <p className="text-xs text-muted-foreground">{dueLabel}</p>
           </div>
-        </div>
+          {assignment.weight > 1 && (
+            <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+              ×{assignment.weight} weight
+            </span>
+          )}
+          <Button variant="outline" size="sm" onClick={startFocus}>
+            <Flame className="h-3.5 w-3.5" />Focus
+          </Button>
+          <Button variant="gradient" size="sm" onClick={markComplete} disabled={assignment.completed}>
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            {assignment.completed ? 'Done' : 'Mark complete'}
+          </Button>
+        </CardContent>
+      </Card>
 
-        {/* Center: workspace tabs */}
-        <div className="space-y-3">
+      {assignment.description && (
+        <Card>
+          <CardContent className="p-4">
+            <p className="whitespace-pre-wrap text-sm leading-relaxed">{assignment.description}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Two-column: workspace + AI chat */}
+      <div className="flex flex-col gap-4 lg:flex-row">
+        {/* Workspace */}
+        <div className="min-w-0 flex-1 space-y-3">
           <div className="flex gap-1 rounded-lg border bg-card/60 p-1 text-xs">
             <button
               onClick={() => setTab('calculator')}
@@ -224,12 +224,12 @@ export default function AssignmentWorkspace() {
             </button>
           </div>
 
-          <div className="min-h-[500px] rounded-xl border bg-card overflow-hidden">
+          <div className="overflow-hidden rounded-xl border bg-card">
             {tab === 'calculator' && (
               <iframe
                 src="https://www.desmos.com/calculator"
                 title="Desmos calculator"
-                className="h-[600px] w-full border-0"
+                className="block h-[640px] w-full border-0"
                 allow="clipboard-write"
               />
             )}
@@ -238,11 +238,11 @@ export default function AssignmentWorkspace() {
                 value={scratch}
                 onChange={(e) => setScratch(e.target.value)}
                 placeholder="Work through it here. Autosaves locally."
-                className="min-h-[500px] w-full resize-none rounded-none border-0 bg-transparent p-4 text-sm focus-visible:ring-0"
+                className="min-h-[640px] w-full resize-none rounded-none border-0 bg-transparent p-4 text-sm focus-visible:ring-0"
               />
             )}
             {tab === 'notes' && (
-              <div className="p-4 space-y-3">
+              <div className="p-4 space-y-3 min-h-[640px]">
                 {classSets.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
                     No study sets linked to {cls?.name || 'this class'} yet. Create one on the Notes page and link it to this class.
@@ -278,8 +278,8 @@ export default function AssignmentWorkspace() {
           </div>
         </div>
 
-        {/* Right: AI chat */}
-        <div className="flex h-[500px] flex-col rounded-xl border bg-card overflow-hidden lg:sticky lg:top-6 lg:h-[calc(100vh-8rem)]">
+        {/* AI chat */}
+        <div className="flex h-[640px] shrink-0 flex-col overflow-hidden rounded-xl border bg-card lg:w-[360px] lg:sticky lg:top-6 lg:h-[calc(100vh-8rem)]">
           <div className="border-b px-4 py-3">
             <div className="flex items-center gap-2">
               <span className="grid h-6 w-6 place-items-center rounded-full bg-primary/10">
@@ -294,7 +294,7 @@ export default function AssignmentWorkspace() {
             </div>
           </div>
 
-          <div ref={chatEndRef} className="flex-1 overflow-y-auto px-3 py-3 space-y-3 text-sm">
+          <div ref={chatEndRef} className="flex-1 space-y-3 overflow-y-auto px-3 py-3 text-sm">
             {messages.length === 0 && (
               <div className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
                 Ask anything about this assignment. Try:
