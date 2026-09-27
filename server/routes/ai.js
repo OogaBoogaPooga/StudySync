@@ -718,5 +718,113 @@ router.post('/grades/parse-text', validate(z.object({
 
   res.json({ classes, detected: classes.length });
 }));
+/* ---------- Assignment workspace analysis ---------- */
 
+const WORKSPACE_KINDS = ['math', 'science', 'english', 'history', 'reading', 'exam_prep', 'coding', 'project', 'foreign_language', 'other'];
+const WORKSPACE_TOOLS = ['calculator', 'scratchpad', 'notes', 'outline', 'sources', 'flashcards', 'quiz', 'timer'];
+
+const WORKSPACE_PROMPT = `You analyze a student's assignment and recommend the right tools.
+
+Return ONLY valid JSON:
+{
+  "kind": "math" | "science" | "english" | "history" | "reading" | "exam_prep" | "coding" | "project" | "foreign_language" | "other",
+  "summary": "one clear sentence about what this assignment is asking for",
+  "firstSteps": ["concrete step 1", "concrete step 2", "concrete step 3"],
+  "tools": ["scratchpad" | "calculator" | "outline" | "sources" | "notes" | "flashcards" | "quiz" | "timer"],
+  "tips": "one or two sentences of specific advice for this assignment"
+}
+
+CLASSIFICATION RULES:
+- math → kind "math" (algebra, geometry, calculus, stats)
+- science → kind "science" (bio, chem, physics, any lab)
+- essays, writing, literary analysis → kind "english"
+- historical analysis, DBQ, primary source work → kind "history"
+- assigned reading with notes/responses → kind "reading"
+- "study for test/quiz/exam" → kind "exam_prep"
+- coding, programming → kind "coding"
+- long-term, multi-step, creative → kind "project"
+- Spanish/French/etc → kind "foreign_language"
+
+TOOL SELECTION (pick 2-4 that actually fit):
+- math → calculator, scratchpad, notes
+- science → calculator (only if equations), notes, flashcards, quiz
+- english/history essays → outline, sources, notes
+- reading → notes, flashcards, quiz
+- exam prep → flashcards, quiz, notes
+- coding → scratchpad, notes
+- project → outline, scratchpad, notes, timer
+- NEVER include calculator for essays, reading, or foreign language
+
+First steps must be SPECIFIC to the assignment title and class — not generic advice like "read carefully".`;
+
+router.post('/workspace/:assignmentId/analyze', validate(z.object({
+  rubric: z.string().max(20000).optional(),
+})), wrap(async (req, res) => {
+  if (!process.env.GROQ_API_KEY) {
+    return res.status(500).json({ error: 'AI is not configured on the server.' });
+  }
+
+  const a = await prisma.assignment.findFirst({
+    where: { id: req.params.assignmentId, userId: req.user.id },
+    include: { class: true },
+  });
+  if (!a) return res.status(404).json({ error: 'Assignment not found' });
+
+  const incomingRubric = (req.body.rubric || '').trim();
+  const rubric = incomingRubric || a.rubricText || '';
+
+  const context = [
+    `Title: ${a.title}`,
+    a.class?.name ? `Class: ${a.class.name}` : '',
+    a.description ? `Description: ${a.description}` : '',
+    rubric ? `Rubric / Directions: ${rubric.slice(0, 6000)}` : '',
+  ].filter(Boolean).join('\n');
+
+  let parsed;
+  try {
+    const raw = await callAI({
+      systemPrompt: WORKSPACE_PROMPT,
+      userPrompt: context,
+      jsonMode: true,
+      maxTokens: 900,
+    });
+    parsed = JSON.parse(raw);
+  } catch (e) {
+    console.error('[workspace/analyze] AI error:', e.message);
+    return res.status(502).json({ error: 'AI could not analyze this assignment. Try again or add a rubric.' });
+  }
+
+  const tools = Array.isArray(parsed.tools)
+    ? parsed.tools.filter((t) => WORKSPACE_TOOLS.includes(t)).slice(0, 5)
+    : ['notes'];
+
+  const analysis = {
+    kind: WORKSPACE_KINDS.includes(parsed.kind) ? parsed.kind : 'other',
+    summary: String(parsed.summary || '').slice(0, 400),
+    firstSteps: Array.isArray(parsed.firstSteps)
+      ? parsed.firstSteps.slice(0, 5).map((s) => String(s).slice(0, 200))
+      : [],
+    tools: tools.length ? tools : ['notes'],
+    tips: parsed.tips ? String(parsed.tips).slice(0, 400) : '',
+  };
+
+  await prisma.assignment.update({
+    where: { id: a.id },
+    data: {
+      aiAnalysis: JSON.stringify(analysis),
+      ...(incomingRubric ? { rubricText: incomingRubric } : {}),
+    },
+  });
+
+  res.json({ analysis });
+}));
+
+// Clear the analysis so it can be redone
+router.delete('/workspace/:assignmentId/analyze', wrap(async (req, res) => {
+  await prisma.assignment.updateMany({
+    where: { id: req.params.assignmentId, userId: req.user.id },
+    data: { aiAnalysis: null, rubricText: null },
+  });
+  res.json({ ok: true });
+}));
 export default router;
