@@ -10,7 +10,6 @@ import InstallBanner from './components/InstallBanner.jsx';
 
 const Login = lazy(() => import('./pages/Login.jsx'));
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
-const Planner = lazy(() => import('./pages/Planner.jsx'));
 const CalendarPage = lazy(() => import('./pages/CalendarPage.jsx'));
 const Focus = lazy(() => import('./pages/Focus.jsx'));
 const Notes = lazy(() => import('./pages/Notes.jsx'));
@@ -44,7 +43,6 @@ export default function App() {
             <Route path="/share/:shareId" element={<SharedSet />} />
             <Route element={<Protected><Layout /></Protected>}>
               <Route path="/" element={<Dashboard />} />
-              <Route path="/planner" element={<Planner />} />
               <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/focus" element={<Focus />} />
               <Route path="/notes" element={<Notes />} />
