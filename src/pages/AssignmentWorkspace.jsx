@@ -193,20 +193,20 @@ export default function AssignmentWorkspace() {
     } catch (e) { toast(e.message, 'error'); }
   };
 
-  const sendMessage = async () => {
+    const sendMessage = async () => {
     const text = input.trim();
     if (!text || busy) return;
     setInput('');
     setMessages((m) => [...m, { role: 'user', content: text }]);
     setBusy(true);
     try {
-      const prefix = assignment
-        ? `[Working on "${assignment.title}"${cls ? ` for ${cls.name}` : ''}. ${analysis?.summary || ''}]\n\n`
+      const context = assignment
+        ? `Assignment: "${assignment.title}"${cls ? ` in ${cls.name}` : ''}.${analysis?.summary ? ' ' + analysis.summary : ''}${assignment.description ? ' Description: ' + assignment.description.slice(0, 300) : ''}`
         : '';
-      const res = await chatWithNotes(prefix + text, chatSetId);
+      const res = await chatWithNotes(text, chatSetId, { mode: 'tutor', context });
       setMessages((m) => [...m, { role: 'assistant', content: res.reply }]);
     } catch (err) {
-      setMessages((m) => [...m, { role: 'assistant', content: `Error: ${err.message}` }]);
+      setMessages((m) => [...m, { role: 'assistant', content: `Error: ${err.message || 'Chat failed'}` }]);
     } finally {
       setBusy(false);
     }
