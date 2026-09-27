@@ -481,8 +481,10 @@ function rankChunks(question, chunks) {
 router.post('/chat', validate(z.object({
   message: z.string().trim().min(1),
   setId: z.string().nullable().optional(),
+  mode: z.enum(['notes', 'tutor']).default('notes'),
+  context: z.string().max(2000).optional(),
 })), wrap(async (req, res) => {
-  const { message, setId } = req.body;
+  const { message, setId, mode, context } = req.body;
 
   let sets = [];
   let scopeLabel = 'all of your study sets';
@@ -505,13 +507,6 @@ router.post('/chat', validate(z.object({
   const allCards = sets.flatMap((s) => s.cards.map((c) => ({ ...c, setTitle: s.title })));
   const allChunks = sets.flatMap((s) => chunksFromHtml(s.content, s.title));
 
-  if (!allCards.length && !allChunks.length) {
-    return res.json({
-      reply: "You don't have any notes or cards yet. Add some content to a study set and I'll be able to help.",
-      sources: [],
-    });
-  }
-
   const topChunks = rankChunks(message, allChunks);
   const topCards = rankCards(message, allCards);
 
@@ -527,7 +522,7 @@ router.post('/chat', validate(z.object({
     sources.push({ kind: 'card', setTitle: c.setTitle, text: c.front + ' - ' + c.back });
   }
 
-  if (!passages.length) {
+  if (!passages.length && mode === 'notes') {
     for (const c of allChunks.slice(0, 8)) {
       passages.push('(from notes: "' + c.setTitle + '") ' + c.text);
       sources.push({ kind: 'note', setTitle: c.setTitle, text: c.text });
@@ -538,16 +533,26 @@ router.post('/chat', validate(z.object({
     }
   }
 
-  const passageBlock = passages.length ? passages.join(NL) : '(No matching content.)';
+  const passageBlock = passages.length ? passages.join(NL) : '(No matching notes found.)';
 
-  const systemPrompt = 'You are StudySync\'s study assistant. Answer the user\'s question using ONLY the information in the passages below, drawn from ' + scopeLabel + '.' + NL +
-    'Rules:' + NL +
-    '- If the user asks a factual question and the passages do not contain the answer, reply exactly: "I couldn\'t find that in your notes."' + NL +
-    '- If the user asks a meta-question about their study material ("what should I study", "summarize this set"), recommend specific terms from the passages.' + NL +
-    '- Be concise: 1-3 short paragraphs max.' + NL +
-    '- Do NOT include bracketed citations like [1] or [2]. Just answer naturally.' + NL +
-    '- You may use **bold** to highlight key terms, but only 1-3 per response.' + NL +
-    '- Do not invent facts. Do not use outside knowledge.';
+  const systemPrompt = mode === 'tutor'
+    ? 'You are a patient, encouraging study tutor helping a student with their schoolwork.' + NL +
+      (context ? 'Context for this session: ' + context + NL : '') + NL +
+      'Rules:' + NL +
+      '- Help the student understand — explain concepts step by step, work through problems, check their reasoning.' + NL +
+      '- The passages below are excerpts from their notes. Use them if relevant, but you may also use your own knowledge to teach.' + NL +
+      '- For math or science problems, walk through the reasoning. Ask them to try the next step rather than just giving the answer.' + NL +
+      '- For essays or history, help them shape the argument and cite their notes when relevant.' + NL +
+      '- Be concise. 2-4 short paragraphs max. Use **bold** for key terms only.' + NL +
+      '- Never say "I couldn\'t find that in your notes" — teaching is the goal, not retrieval.'
+    : 'You are StudySync\'s study assistant. Answer the user\'s question using ONLY the information in the passages below, drawn from ' + scopeLabel + '.' + NL +
+      'Rules:' + NL +
+      '- If the user asks a factual question and the passages do not contain the answer, reply exactly: "I couldn\'t find that in your notes."' + NL +
+      '- If the user asks a meta-question about their study material ("what should I study", "summarize this set"), recommend specific terms from the passages.' + NL +
+      '- Be concise: 1-3 short paragraphs max.' + NL +
+      '- Do NOT include bracketed citations like [1] or [2]. Just answer naturally.' + NL +
+      '- You may use **bold** to highlight key terms, but only 1-3 per response.' + NL +
+      '- Do not invent facts. Do not use outside knowledge.';
 
   if (!process.env.GROQ_API_KEY) {
     return res.json({
@@ -556,9 +561,13 @@ router.post('/chat', validate(z.object({
     });
   }
 
+  const userPrompt = passages.length
+    ? 'Passages:' + NL + passageBlock + NL + NL + 'Question: ' + message
+    : 'Question: ' + message;
+
   const reply = await callAI({
     systemPrompt,
-    userPrompt: 'Passages:' + NL + passageBlock + NL + NL + 'Question: ' + message,
+    userPrompt,
     maxTokens: 1200,
   });
 
