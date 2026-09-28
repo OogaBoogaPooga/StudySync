@@ -62,8 +62,10 @@ model Assignment {
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
-  aiAnalysis  String?
-  rubricText  String?
+  aiAnalysis   String?
+  rubricText   String?
+  taskPlan     String?
+  taskProgress String?
 }
 
 model StudySession {
@@ -92,6 +94,9 @@ model StudySet {
   classId  String?
   class    Class?  @relation(fields: [classId], references: [id], onDelete: SetNull)
   unitName String?
+
+  lessonPlan     String?
+  lessonProgress String?
 }
 
 model Flashcard {
