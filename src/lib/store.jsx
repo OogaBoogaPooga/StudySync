@@ -3,12 +3,16 @@ import { api, getToken, setToken, onOffline } from './api.js';
 
 const Ctx = createContext(null);
 const THEME_KEY = 'studysync_theme';
+const SIDEBAR_KEY = 'studysync_sidebar';
 
 export function AppProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(!!getToken());
   const [theme, setTheme] = useState(() => {
     try { return JSON.parse(localStorage.getItem(THEME_KEY) || '{}'); } catch { return {}; }
+  });
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    try { return localStorage.getItem(SIDEBAR_KEY) !== '0'; } catch { return true; }
   });
   const [toast, setToastState] = useState(null);
 
@@ -34,6 +38,11 @@ export function AppProvider({ children }) {
     localStorage.setItem(THEME_KEY, JSON.stringify(theme));
   }, [theme]);
 
+  // Persist sidebar state
+  useEffect(() => {
+    try { localStorage.setItem(SIDEBAR_KEY, sidebarOpen ? '1' : '0'); } catch {}
+  }, [sidebarOpen]);
+
   const login = async (email, password) => {
     const data = await api('/auth/login', { method: 'POST', body: { email, password } });
     setToken(data.token); setUser(data.user);
@@ -47,9 +56,16 @@ export function AppProvider({ children }) {
   const isDark = theme.dark ?? matchMedia('(prefers-color-scheme: dark)').matches;
   const toggleDark = () => setTheme((t) => ({ ...t, dark: !isDark }));
   const toggleContrast = () => setTheme((t) => ({ ...t, contrast: !t.contrast }));
+  const toggleSidebar = () => setSidebarOpen((s) => !s);
 
   return (
-    <Ctx.Provider value={{ user, loading, login, register, logout, isDark, toggleDark, contrast: !!theme.contrast, toggleContrast, toast: showToast }}>
+    <Ctx.Provider value={{
+      user, loading, login, register, logout,
+      isDark, toggleDark,
+      contrast: !!theme.contrast, toggleContrast,
+      toast: showToast,
+      sidebarOpen, toggleSidebar,
+    }}>
       {children}
       {toast && (
         <div role="status" aria-live="polite" className={`fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-[90] rounded-lg px-4 py-2.5 text-sm shadow-lg animate-fade-in ${toast.type === 'error' ? 'bg-destructive text-destructive-foreground' : toast.type === 'warn' ? 'bg-amber-500 text-black' : 'bg-foreground text-background'}`}>
