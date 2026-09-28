@@ -22,19 +22,17 @@
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,800&family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <script>
-      // Apply saved theme before first paint to avoid a flash
+      // Apply saved preferences before first paint to avoid a flash
       try {
         const t = JSON.parse(localStorage.getItem('studysync_theme') || '{}');
         if (t.dark ?? matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.classList.add('dark');
         if (t.contrast) document.documentElement.classList.add('contrast');
         const theme = localStorage.getItem('studysync_theme_v2');
         if (theme && theme !== 'nordic') document.documentElement.setAttribute('data-theme', theme);
+        const style = localStorage.getItem('studysync_ui_style');
+        if (style && style !== 'nordic') document.documentElement.setAttribute('data-style', style);
         if (localStorage.getItem('studysync_reduce_motion') === '1') document.documentElement.classList.add('reduce-motion');
       } catch {}
     </script>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
