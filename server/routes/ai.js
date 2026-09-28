@@ -905,4 +905,354 @@ router.delete('/workspace/:assignmentId/analyze', wrap(async (req, res) => {
   });
   res.json({ ok: true });
 }));
+/* ---------- Guided lesson system ---------- */
+
+const TEACH_MODEL = process.env.GROQ_TEACH_MODEL || 'llama-3.3-70b-versatile';
+const COACH_MODEL = process.env.GROQ_COACH_MODEL || 'llama-3.3-70b-versatile';
+
+async function callTeachAI({ systemPrompt, userPrompt, jsonMode = false, maxTokens = 2000, model }) {
+  const body = {
+    model: model || TEACH_MODEL,
+    temperature: 0.4,
+    max_tokens: maxTokens,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ],
+  };
+  if (jsonMode) body.response_format = { type: 'json_object' };
+
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error(`Teach AI error (${res.status}): ${detail.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  return data.choices[0].message.content;
+}
+
+/* ============ Learn: full material lesson ============ */
+
+const LEARN_PLAN_PROMPT = `You design short study courses from source material. Break the material into 4-8 sequential lessons that build on each other.
+
+Return ONLY valid JSON:
+{
+  "title": "short course title (3-6 words)",
+  "topics": [
+    { "title": "specific topic name", "summary": "one clear sentence about what this topic teaches" }
+  ]
+}
+
+RULES:
+- 4-8 topics, ordered foundational to advanced
+- Titles must be SPECIFIC, not generic. "What alleles are" not "Introduction". "Hardy-Weinberg equation" not "Key concepts".
+- Do NOT invent topics unsupported by the source
+- Summaries 8-15 words`;
+
+const LEARN_TEACH_PROMPT = `You are a patient tutor teaching ONE topic to a student seeing it for the first time.
+
+Return ONLY valid JSON:
+{ "explanation": "<p>paragraph</p><p>paragraph</p>", "question": "string" }
+
+EXPLANATION RULES:
+- 2-3 paragraphs, wrapped in <p> tags
+- Paragraph 1: introduce the concept clearly, assume zero prior knowledge
+- Paragraph 2: a CONCRETE example (a number, scenario, or specific case)
+- Bold key terms with <strong>term</strong>
+- Use source terminology, don't add outside facts
+- No filler like "It's important to note"
+
+QUESTION RULES:
+- ONE question that checks understanding, not recall
+- Should be answerable from what you just taught
+- Not trivia`;
+
+const LEARN_CHECK_PROMPT = `You're checking a student's answer to a checkpoint question.
+
+Return ONLY valid JSON:
+{ "verdict": "correct" | "partial" | "off", "feedback": "<p>paragraph</p>" }
+
+FEEDBACK RULES:
+- 1-3 sentences in <p> tags
+- "correct": confirm what they got right, add ONE small extra insight
+- "partial": name what's right, clarify the specific gap
+- "off": gently correct, restate the key point in one sentence
+- Never open with "Great!" or "Good job!"
+- Never restate the whole concept`;
+
+router.post('/lesson/:setId/plan', wrap(async (req, res) => {
+  if (!process.env.GROQ_API_KEY) return res.status(500).json({ error: 'AI is not configured.' });
+  const set = await prisma.studySet.findFirst({ where: { id: req.params.setId, userId: req.user.id } });
+  if (!set) return res.status(404).json({ error: 'Set not found' });
+
+  if (set.lessonPlan && !req.body?.regenerate) {
+    try { const c = JSON.parse(set.lessonPlan); if (c?.topics?.length) return res.json({ plan: c, cached: true }); } catch {}
+  }
+
+  const plain = stripHtml(set.content || '');
+  if (plain.length < 100) return res.status(400).json({ error: 'This set needs more content.' });
+
+  let parsed;
+  try {
+    const raw = await callTeachAI({ systemPrompt: LEARN_PLAN_PROMPT, userPrompt: plain.slice(0, 12000), jsonMode: true, maxTokens: 1200 });
+    parsed = JSON.parse(raw);
+  } catch (e) {
+    console.error('[lesson/plan]', e.message);
+    return res.status(502).json({ error: 'Could not build a plan. Try again.' });
+  }
+
+  const topics = Array.isArray(parsed.topics)
+    ? parsed.topics.map((t) => ({ title: String(t.title || '').trim().slice(0, 120), summary: String(t.summary || '').trim().slice(0, 200) })).filter((t) => t.title).slice(0, 8)
+    : [];
+  if (topics.length < 2) return res.status(502).json({ error: 'Not enough material.' });
+
+  const plan = { title: String(parsed.title || set.title || 'Lesson').slice(0, 80), topics };
+  await prisma.studySet.update({ where: { id: set.id }, data: { lessonPlan: JSON.stringify(plan), lessonProgress: JSON.stringify({ currentIndex: 0, answers: {}, completed: [] }) } });
+  res.json({ plan, cached: false });
+}));
+
+router.get('/lesson/:setId/plan', wrap(async (req, res) => {
+  const set = await prisma.studySet.findFirst({ where: { id: req.params.setId, userId: req.user.id }, select: { lessonPlan: true, lessonProgress: true } });
+  if (!set) return res.status(404).json({ error: 'Set not found' });
+  let plan = null, progress = null;
+  try { plan = set.lessonPlan ? JSON.parse(set.lessonPlan) : null; } catch {}
+  try { progress = set.lessonProgress ? JSON.parse(set.lessonProgress) : null; } catch {}
+  res.json({ plan, progress });
+}));
+
+router.post('/lesson/:setId/topic/:index', wrap(async (req, res) => {
+  if (!process.env.GROQ_API_KEY) return res.status(500).json({ error: 'AI is not configured.' });
+  const set = await prisma.studySet.findFirst({ where: { id: req.params.setId, userId: req.user.id } });
+  if (!set) return res.status(404).json({ error: 'Set not found' });
+
+  let plan; try { plan = JSON.parse(set.lessonPlan || '{}'); } catch {}
+  if (!plan?.topics?.length) return res.status(400).json({ error: 'No plan yet.' });
+
+  const idx = Number(req.params.index);
+  const topic = plan.topics[idx];
+  if (!topic) return res.status(404).json({ error: 'Topic not found' });
+
+  const answer = typeof req.body?.answer === 'string' ? req.body.answer.trim() : '';
+  const priorQuestion = typeof req.body?.question === 'string' ? req.body.question : '';
+
+  if (answer && priorQuestion) {
+    let parsed;
+    try {
+      const raw = await callTeachAI({ systemPrompt: LEARN_CHECK_PROMPT, userPrompt: `Topic: ${topic.title}\nSummary: ${topic.summary}\n\nQuestion: ${priorQuestion}\nStudent's answer: ${answer}`, jsonMode: true, maxTokens: 400 });
+      parsed = JSON.parse(raw);
+    } catch (e) { console.error('[lesson/check]', e.message); return res.status(502).json({ error: 'Could not check. Try again.' }); }
+
+    const verdict = ['correct', 'partial', 'off'].includes(parsed.verdict) ? parsed.verdict : 'partial';
+    let progress = { currentIndex: idx, answers: {}, completed: [] };
+    try { progress = JSON.parse(set.lessonProgress || '{}') || progress; } catch {}
+    progress.answers = progress.answers || {};
+    progress.answers[String(idx)] = answer;
+    progress.completed = progress.completed || [];
+    if (verdict === 'correct' && !progress.completed.includes(idx)) progress.completed.push(idx);
+    progress.currentIndex = idx;
+
+    await prisma.studySet.update({ where: { id: set.id }, data: { lessonProgress: JSON.stringify(progress) } });
+    return res.json({ verdict, feedback: String(parsed.feedback || '').slice(0, 2000), progress });
+  }
+
+  let parsed;
+  try {
+    const raw = await callTeachAI({ systemPrompt: LEARN_TEACH_PROMPT, userPrompt: `Course: ${plan.title}\nTopic ${idx + 1} of ${plan.topics.length}: ${topic.title}\nSummary: ${topic.summary}\n\nSource material:\n\n${stripHtml(set.content || '').slice(0, 8000)}`, jsonMode: true, maxTokens: 1400 });
+    parsed = JSON.parse(raw);
+  } catch (e) { console.error('[lesson/teach]', e.message); return res.status(502).json({ error: 'Could not generate lesson. Try again.' }); }
+
+  res.json({ explanation: String(parsed.explanation || '').slice(0, 6000), question: String(parsed.question || '').slice(0, 600), topic: { index: idx, ...topic } });
+}));
+
+router.post('/lesson/:setId/reset', wrap(async (req, res) => {
+  const set = await prisma.studySet.findFirst({ where: { id: req.params.setId, userId: req.user.id }, select: { id: true } });
+  if (!set) return res.status(404).json({ error: 'Set not found' });
+  await prisma.studySet.update({ where: { id: set.id }, data: { lessonProgress: JSON.stringify({ currentIndex: 0, answers: {}, completed: [] }) } });
+  res.json({ ok: true });
+}));
+
+/* ============ Coach: assignment step-by-step ============ */
+
+const ASSIGN_PLAN_PROMPT = `You break an assignment into clear, executable steps a student can complete RIGHT NOW.
+
+Return ONLY valid JSON:
+{
+  "kind": "essay" | "problem_set" | "reading" | "project" | "coding" | "exam_prep" | "lab" | "other",
+  "goal": "one sentence about what the finished work accomplishes",
+  "deliverable": "what the student turns in (e.g. 'a 5-paragraph DBQ essay', '24 solved problems')",
+  "steps": [
+    {
+      "title": "short action title, 3-6 words",
+      "task": "1-2 sentences describing exactly what to do",
+      "howTo": "concrete instruction for HOW to do it — include what a good output looks like",
+      "doneWhen": "specific test — 'you have 1 sentence stating your position on X'",
+      "workType": "text" | "scratch" | "check"
+    }
+  ]
+}
+
+RULES:
+- Steps are ACTIONS the student does
+- Order so each step produces something the next uses
+- 4-7 steps
+- First step: read and understand the ask
+- Last step: review and finalize
+- For essays: understand prompt → take a position → find evidence → outline → draft → revise
+- For problem sets: understand method → work through one → solve rest → check
+- For reading: skim structure → read carefully → identify claims → respond
+- workType: "text" for written, "scratch" for math/equations, "check" for simple confirm
+- NO filler steps like "get started" or "ask questions"`;
+
+const COACH_STEP_PROMPT = `You are tutoring a student through one step of an assignment. They're working on it RIGHT NOW.
+
+Return ONLY valid JSON:
+{ "coaching": "<p>paragraph</p>", "prompts": ["thinking prompt 1", "thinking prompt 2"] }
+
+COACHING RULES:
+- 1-2 short paragraphs in <p> tags
+- Paragraph 1: what they're doing RIGHT NOW plus ONE concrete example of good work for THIS step (sample thesis, sample first line of work)
+- Paragraph 2 (optional): one specific piece of advice that saves time or catches a common mistake
+- Never say "Great!" or "Let's go!"
+- Never restate the prompt
+- Under 120 words`;
+
+const COACH_CHECK_PROMPT = `You're reviewing a student's work on ONE step of an assignment. Honest but encouraging. Never rewrite for them.
+
+Return ONLY valid JSON:
+{ "status": "done" | "needs_work" | "off_track", "feedback": "<p>paragraph</p>" }
+
+FEEDBACK RULES:
+- 2-3 sentences in <p> tags
+- "done" — meets criteria. Confirm what's good, tell them to move on.
+- "needs_work" — right direction, missing something specific. Name it.
+- "off_track" — wrong direction. Redirect gently, restate what the step asks.
+- Never rewrite their work
+- For math: if right, confirm and name the key step. If wrong, ask them to check a specific line rather than giving the answer.`;
+
+router.post('/coach/:assignmentId/plan', wrap(async (req, res) => {
+  if (!process.env.GROQ_API_KEY) return res.status(500).json({ error: 'AI is not configured.' });
+  const a = await prisma.assignment.findFirst({ where: { id: req.params.assignmentId, userId: req.user.id }, include: { class: true } });
+  if (!a) return res.status(404).json({ error: 'Assignment not found' });
+
+  if (a.taskPlan && !req.body?.regenerate) {
+    try { const c = JSON.parse(a.taskPlan); if (c?.steps?.length) return res.json({ plan: c, cached: true }); } catch {}
+  }
+
+  const context = [
+    `Title: ${a.title}`,
+    a.class?.name ? `Class: ${a.class.name}` : '',
+    a.type ? `Type: ${a.type}` : '',
+    a.description ? `Description: ${a.description}` : '',
+    a.rubricText ? `Rubric / Directions: ${a.rubricText.slice(0, 5000)}` : '',
+    `Due: ${new Date(a.dueDate).toLocaleDateString()}`,
+  ].filter(Boolean).join('\n');
+
+  let parsed;
+  try {
+    const raw = await callTeachAI({ systemPrompt: ASSIGN_PLAN_PROMPT, userPrompt: context, jsonMode: true, maxTokens: 1800, model: COACH_MODEL });
+    parsed = JSON.parse(raw);
+  } catch (e) { console.error('[coach/plan]', e.message); return res.status(502).json({ error: 'Could not build a plan. Try again.' }); }
+
+  const steps = Array.isArray(parsed.steps)
+    ? parsed.steps.map((s) => ({
+        title: String(s.title || '').trim().slice(0, 100),
+        task: String(s.task || '').trim().slice(0, 400),
+        howTo: String(s.howTo || '').trim().slice(0, 800),
+        doneWhen: String(s.doneWhen || '').trim().slice(0, 300),
+        workType: ['text', 'scratch', 'check'].includes(s.workType) ? s.workType : 'text',
+      })).filter((s) => s.title).slice(0, 7)
+    : [];
+
+  if (steps.length < 3) return res.status(502).json({ error: 'Not enough detail. Add a description or rubric.' });
+
+  const plan = {
+    kind: parsed.kind || 'other',
+    goal: String(parsed.goal || '').slice(0, 400),
+    deliverable: String(parsed.deliverable || '').slice(0, 300),
+    steps,
+  };
+
+  await prisma.assignment.update({ where: { id: a.id }, data: { taskPlan: JSON.stringify(plan), taskProgress: JSON.stringify({ currentIndex: 0, work: {}, completed: [] }) } });
+  res.json({ plan, cached: false });
+}));
+
+router.get('/coach/:assignmentId/plan', wrap(async (req, res) => {
+  const a = await prisma.assignment.findFirst({ where: { id: req.params.assignmentId, userId: req.user.id }, select: { taskPlan: true, taskProgress: true } });
+  if (!a) return res.status(404).json({ error: 'Assignment not found' });
+  let plan = null, progress = null;
+  try { plan = a.taskPlan ? JSON.parse(a.taskPlan) : null; } catch {}
+  try { progress = a.taskProgress ? JSON.parse(a.taskProgress) : null; } catch {}
+  res.json({ plan, progress });
+}));
+
+router.post('/coach/:assignmentId/step/:index', wrap(async (req, res) => {
+  if (!process.env.GROQ_API_KEY) return res.status(500).json({ error: 'AI is not configured.' });
+  const a = await prisma.assignment.findFirst({ where: { id: req.params.assignmentId, userId: req.user.id }, include: { class: true } });
+  if (!a) return res.status(404).json({ error: 'Assignment not found' });
+
+  let plan; try { plan = JSON.parse(a.taskPlan || '{}'); } catch {}
+  if (!plan?.steps?.length) return res.status(400).json({ error: 'No plan yet.' });
+
+  const idx = Number(req.params.index);
+  const step = plan.steps[idx];
+  if (!step) return res.status(404).json({ error: 'Step not found' });
+
+  const work = typeof req.body?.work === 'string' ? req.body.work.trim() : '';
+
+  if (work) {
+    let parsed;
+    try {
+      const raw = await callTeachAI({
+        systemPrompt: COACH_CHECK_PROMPT,
+        userPrompt: `Assignment: ${a.title}${a.class ? ` (${a.class.name})` : ''}\nDeliverable: ${plan.deliverable || ''}\n\nCurrent step: ${step.title}\nTask: ${step.task}\nDone when: ${step.doneWhen}\n\nStudent's work:\n${work}`,
+        jsonMode: true, maxTokens: 600, model: COACH_MODEL,
+      });
+      parsed = JSON.parse(raw);
+    } catch (e) { console.error('[coach/check]', e.message); return res.status(502).json({ error: 'Could not check. Try again.' }); }
+
+    const status = ['done', 'needs_work', 'off_track'].includes(parsed.status) ? parsed.status : 'needs_work';
+
+    let progress = { currentIndex: idx, work: {}, completed: [] };
+    try { progress = JSON.parse(a.taskProgress || '{}') || progress; } catch {}
+    progress.work = progress.work || {};
+    progress.work[String(idx)] = work;
+    progress.completed = progress.completed || [];
+    if (status === 'done' && !progress.completed.includes(idx)) progress.completed.push(idx);
+    progress.currentIndex = idx;
+
+    const totalSteps = plan.steps.length;
+    const pct = Math.round((progress.completed.length / totalSteps) * 100);
+    const isAllDone = progress.completed.length === totalSteps;
+
+    await prisma.assignment.update({ where: { id: a.id }, data: { taskProgress: JSON.stringify(progress), progress: pct, completed: isAllDone ? true : a.completed } });
+    return res.json({ status, feedback: String(parsed.feedback || '').slice(0, 2000), progress, assignmentProgress: pct });
+  }
+
+  let parsed;
+  try {
+    const raw = await callTeachAI({
+      systemPrompt: COACH_STEP_PROMPT,
+      userPrompt: `Assignment: ${a.title}${a.class ? ` (${a.class.name})` : ''}\nType: ${plan.kind}\n` + (a.description ? `Description: ${a.description.slice(0, 500)}\n` : '') + (a.rubricText ? `Rubric: ${a.rubricText.slice(0, 1500)}\n` : '') + `\nThis step (${idx + 1} of ${plan.steps.length}): ${step.title}\nTask: ${step.task}\nHow to: ${step.howTo}\nDone when: ${step.doneWhen}\n`,
+      jsonMode: true, maxTokens: 900, model: COACH_MODEL,
+    });
+    parsed = JSON.parse(raw);
+  } catch (e) { console.error('[coach/teach]', e.message); return res.status(502).json({ error: 'Could not generate coaching. Try again.' }); }
+
+  res.json({
+    coaching: String(parsed.coaching || '').slice(0, 3000),
+    prompts: Array.isArray(parsed.prompts) ? parsed.prompts.slice(0, 4).map((p) => String(p).slice(0, 200)) : [],
+    step: { index: idx, ...step },
+  });
+}));
+
+router.post('/coach/:assignmentId/reset', wrap(async (req, res) => {
+  const a = await prisma.assignment.findFirst({ where: { id: req.params.assignmentId, userId: req.user.id }, select: { id: true } });
+  if (!a) return res.status(404).json({ error: 'Assignment not found' });
+  await prisma.assignment.update({ where: { id: a.id }, data: { taskProgress: JSON.stringify({ currentIndex: 0, work: {}, completed: [] }) } });
+  res.json({ ok: true });
+}));
 export default router;
