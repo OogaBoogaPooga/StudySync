@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Sparkles, Share2, Plus, Trash2, ArrowLeft, Play, Clock, HelpCircle, Layers, PenLine } from 'lucide-react';
+import { Sparkles, Share2, Plus, Trash2, ArrowLeft, Play, Clock, HelpCircle, Layers, PenLine, BookOpen } from 'lucide-react';
 import { api, generateQuiz, reviewCard } from '@/lib/api.js';
 import { useApp } from '@/lib/store.jsx';
 import { Button } from '@/components/ui/button.jsx';
@@ -197,6 +197,9 @@ export default function StudySet() {
       {/* AI tutor actions — single row for all AI actions */}
       <div className="flex flex-wrap gap-2 rounded-lg border bg-card/40 p-2">
         <span className="self-center px-2 text-[11px] uppercase tracking-wide text-muted-foreground">AI tutor</span>
+        <Button variant="outline" size="sm" onClick={() => navigate(`/learn/${id}`)} disabled={!set.content || set.content.length < 100}>
+          <BookOpen className="h-3.5 w-3.5 text-emerald-500" />Teach me
+        </Button>
         <Button variant="outline" size="sm" onClick={() => askAI('Explain')}>
           <Sparkles className="h-3.5 w-3.5 text-violet-500" />Explain
         </Button>
