@@ -4,6 +4,11 @@ import { cn } from '@/lib/utils';
 const LS_KEY = 'studysync_quokka';
 const CLICK_WINDOW_MS = 1500;
 
+/**
+ * StudySync logo — full mark + wordmark rendered as one image.
+ * Easter egg: click three times within 1.5s to swap to a quokka.
+ * Three more clicks revert.
+ */
 export default function Logo({ size = 'md', className }) {
   const [quokka, setQuokka] = useState(() => {
     try { return localStorage.getItem(LS_KEY) === '1'; } catch { return false; }
@@ -22,41 +27,30 @@ export default function Logo({ size = 'md', className }) {
     }
   };
 
-  const tileSize =
-    size === 'sm' ? 'h-10 w-10 rounded-lg' :
-    size === 'lg' ? 'h-14 w-14 rounded-2xl' :
-    'h-11 w-11 rounded-xl';
-
-  const textSize =
-    size === 'sm' ? 'text-lg' :
-    size === 'lg' ? 'text-3xl' :
-    'text-xl';
+  const heightClass =
+    size === 'sm' ? 'h-9' :
+    size === 'lg' ? 'h-20' :
+    'h-14';
 
   return (
     <button
       type="button"
       onClick={handleClick}
-      className={cn('flex items-center gap-2.5 select-none focus:outline-none', className)}
+      className={cn('inline-flex items-center select-none focus:outline-none', className)}
       aria-label="StudySync"
       title="StudySync"
     >
-      <span
-        className={cn(
-          'relative grid shrink-0 place-items-center overflow-hidden shadow-md ring-1 ring-inset ring-white/20',
-          tileSize
-        )}
-      >
+      {quokka ? (
+        <span className={cn('grid aspect-square place-items-center overflow-hidden rounded-lg ring-1 ring-inset ring-white/20 shadow-md bg-card', heightClass)}>
+          <img src="/quokka.jpg" alt="" className="h-full w-full object-cover" />
+        </span>
+      ) : (
         <img
-          src={quokka ? '/quokka.jpg' : '/logo.png'}
-          alt=""
-          className={cn(
-            'h-full w-full',
-            // Quokka: fill the tile (crop if needed). Logo: fit entirely inside.
-            quokka ? 'object-cover' : 'object-contain'
-          )}
+          src="/logo.png"
+          alt="StudySync"
+          className={cn('w-auto object-contain', heightClass)}
         />
-      </span>
-      <span className={cn('font-bold gradient-text', textSize)}>StudySync</span>
+      )}
     </button>
   );
 }
