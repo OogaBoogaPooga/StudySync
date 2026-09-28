@@ -160,6 +160,7 @@ ABSOLUTE RULE — no added information:
 - If the source doesn't say something, do not say it.
 - Do NOT correct, expand, or replace the source's explanation with information from your own knowledge.
 - If the source is incomplete or vague, keep the note incomplete or vague rather than filling in the gap.
+- Prefer the source's exact level of specificity. Do not make a statement more specific than the source, even when the added detail is likely true.
 
 A shorter note that's strictly accurate is better than a longer note that adds outside context. Students get graded on whether they captured the source, not on how much you know.
 
