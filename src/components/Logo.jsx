@@ -23,9 +23,9 @@ export default function Logo({ size = 'md', className }) {
   };
 
   const tileSize =
-    size === 'sm' ? 'h-8 w-8 rounded-lg' :
-    size === 'lg' ? 'h-12 w-12 rounded-2xl' :
-    'h-9 w-9 rounded-xl';
+    size === 'sm' ? 'h-9 w-9 rounded-lg' :
+    size === 'lg' ? 'h-14 w-14 rounded-2xl' :
+    'h-11 w-11 rounded-xl';
 
   const textSize =
     size === 'sm' ? 'text-base' :
@@ -42,21 +42,18 @@ export default function Logo({ size = 'md', className }) {
     >
       <span
         className={cn(
-          'relative shrink-0 overflow-hidden bg-white shadow-md ring-1 ring-inset ring-black/10 dark:ring-white/10',
+          'relative grid shrink-0 place-items-center overflow-hidden bg-white shadow-md ring-1 ring-inset ring-black/10 dark:ring-white/10',
           tileSize
         )}
       >
-        {quokka ? (
-          <img src="/quokka.jpg" alt="" className="h-full w-full object-cover" />
-        ) : (
-          // Crop to the icon: image is 185% of tile width, top-aligned,
-          // horizontally centered. The wordmark is off-screen below.
-          <img
-            src="/logo.png"
-            alt=""
-            className="absolute left-1/2 top-0 w-[185%] max-w-none -translate-x-1/2"
-          />
-        )}
+        <img
+          src={quokka ? '/quokka.jpg' : '/logo.png'}
+          alt=""
+          className={cn(
+            'h-full w-full',
+            quokka ? 'object-cover' : 'object-contain'
+          )}
+        />
       </span>
       <span className={cn('font-bold gradient-text', textSize)}>StudySync</span>
     </button>
