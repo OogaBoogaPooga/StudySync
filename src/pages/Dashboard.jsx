@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format, formatDistanceToNow } from 'date-fns';
-import { Plus, Pencil, Trash2, CalendarPlus, AlertTriangle, CheckCircle2, Bell, ArrowRight, Flame, Sparkles } from 'lucide-react';
+import { Plus, Pencil, Trash2, CalendarPlus, AlertTriangle, CheckCircle2, Bell, ArrowRight, Flame, Sparkles, X } from 'lucide-react';
 import { api } from '@/lib/api.js';
 import { useApp } from '@/lib/store.jsx';
 import { assignmentStatus, googleCalendarUrl, SUBJECT_COLORS } from '@/lib/utils';
@@ -16,11 +16,8 @@ const STATUS_LABEL = { late: 'Late', soon: 'Due soon', done: 'Done', upcoming: '
 const toLocalInput = (d) => format(new Date(d), "yyyy-MM-dd'T'HH:mm");
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const POPUP_DISMISS_KEY = 'studysync_heroDismissed';
 
-/**
- * Rank assignments by how much they matter right now.
- * Higher score = more urgent.
- */
 function scoreAssignment(a) {
   const due = new Date(a.dueDate).getTime();
   const daysOut = (due - Date.now()) / DAY_MS;
@@ -45,6 +42,7 @@ export default function Dashboard() {
   const [filter, setFilter] = useState('all');
   const [editing, setEditing] = useState(null);
   const [classDialog, setClassDialog] = useState(false);
+  const [heroPopupOpen, setHeroPopupOpen] = useState(false);
 
   const load = async () => {
     try {
@@ -71,12 +69,30 @@ export default function Dashboard() {
     total: assignments.length,
   }), [assignments]);
 
-  // Top pick — the one assignment that matters most right now
   const nextUp = useMemo(() => {
     const open = assignments.filter((a) => !a.completed);
     if (!open.length) return null;
     return open.slice().sort((a, b) => scoreAssignment(b) - scoreAssignment(a))[0];
   }, [assignments]);
+
+  // Show the popup once per session, and only if we have something to show
+  useEffect(() => {
+    if (!nextUp) return;
+    const dismissed = sessionStorage.getItem(POPUP_DISMISS_KEY) === '1';
+    if (dismissed) return;
+    const t = setTimeout(() => setHeroPopupOpen(true), 350);
+    return () => clearTimeout(t);
+  }, [nextUp?.id]);
+
+  const dismissHeroPopup = () => {
+    setHeroPopupOpen(false);
+    try { sessionStorage.setItem(POPUP_DISMISS_KEY, '1'); } catch {}
+  };
+
+  const startFromPopup = () => {
+    dismissHeroPopup();
+    if (nextUp) navigate(`/work/${nextUp.id}`);
+  };
 
   const visible = assignments.filter((a) => filter === 'all' ? true : filter === 'open' ? !a.completed : assignmentStatus(a) === filter);
 
@@ -110,12 +126,10 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ---------- Hero: do this next ---------- */}
       {nextUp && (
         <HeroCard assignment={nextUp} onStart={() => navigate(`/work/${nextUp.id}`)} />
       )}
 
-      {/* Stat cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Stat label="Late" value={stats.late} tone="text-red-500" icon={AlertTriangle} />
         <Stat label="Due in 24h" value={stats.soon} tone="text-amber-500" />
@@ -123,7 +137,6 @@ export default function Dashboard() {
         <Stat label="Overall" value={`${stats.total ? Math.round(assignments.reduce((s, a) => s + a.progress, 0) / stats.total) : 0}%`} tone="text-primary" />
       </div>
 
-      {/* Class chips */}
       <div className="flex flex-wrap gap-2">
         {classes.map((c) => (
           <span key={c.id} className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium"><span className="h-2.5 w-2.5 rounded-full" style={{ background: c.color }} />{c.name} <span className="text-muted-foreground">({c._count?.assignments ?? 0})</span></span>
@@ -131,14 +144,12 @@ export default function Dashboard() {
         {!classes.length && <p className="text-sm text-muted-foreground">No classes yet — add one under "Manage classes".</p>}
       </div>
 
-      {/* Filters */}
       <div className="flex gap-1 overflow-x-auto" role="tablist" aria-label="Filter assignments">
         {['all', 'open', 'late', 'soon', 'done'].map((f) => (
           <button key={f} role="tab" aria-selected={filter === f} onClick={() => setFilter(f)} className={`rounded-full px-3 py-1 text-xs font-medium capitalize transition ${filter === f ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent'}`}>{f === 'soon' ? 'Due soon' : f}</button>
         ))}
       </div>
 
-      {/* Assignment list */}
       <div className="grid gap-3 md:grid-cols-2">
         {visible.map((a) => {
           const status = assignmentStatus(a);
@@ -180,6 +191,11 @@ export default function Dashboard() {
         {!visible.length && <p className="text-muted-foreground text-sm col-span-full py-10 text-center">Nothing here. Enjoy the free time.</p>}
       </div>
 
+      {/* Hero popup — fires once per session when there's something urgent */}
+      {heroPopupOpen && nextUp && (
+        <HeroPopup assignment={nextUp} onStart={startFromPopup} onClose={dismissHeroPopup} />
+      )}
+
       <AssignmentDialog editing={editing} classes={classes} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />
       <ClassDialog open={classDialog} classes={classes} onClose={() => setClassDialog(false)} onChanged={load} />
     </div>
@@ -187,9 +203,92 @@ export default function Dashboard() {
 }
 
 /**
- * Big hero card at the top of the Dashboard. Shows the highest-priority
- * open assignment and gives a Start button that opens the workspace.
+ * Centered modal that pops up on first Dashboard visit each session.
+ * Shows the top-priority assignment and gives one clear action.
  */
+function HeroPopup({ assignment, onStart, onClose }) {
+  const status = assignmentStatus(assignment);
+  const due = new Date(assignment.dueDate);
+  const daysOut = Math.round((due - Date.now()) / DAY_MS);
+
+  let headline = 'Do this next';
+  if (status === 'late') headline = "You're behind on this one";
+  else if (status === 'soon') headline = 'Due very soon';
+  else if (daysOut <= 3) headline = 'Coming up';
+
+  let dueText;
+  if (status === 'late') dueText = `Overdue · ${format(due, 'MMM d')}`;
+  else if (daysOut === 0) dueText = 'Due today';
+  else if (daysOut === 1) dueText = 'Due tomorrow';
+  else dueText = `Due in ${daysOut} days`;
+
+  // Close on Escape
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
+      <div
+        role="dialog"
+        aria-label="Next up"
+        className="relative z-10 w-full max-w-lg animate-fade-in overflow-hidden rounded-2xl border bg-card shadow-2xl"
+      >
+        <div className="h-1.5 w-full" style={{ background: assignment.class?.color || 'hsl(var(--primary))' }} />
+
+        <button
+          onClick={onClose}
+          className="absolute right-3 top-3 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          aria-label="Dismiss"
+        >
+          <X className="h-4 w-4" />
+        </button>
+
+        <div className="space-y-4 p-6">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/15 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-primary">
+              <Flame className="h-3 w-3" />{headline}
+            </span>
+            {assignment.class?.name && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium">
+                <span className="h-2 w-2 rounded-full" style={{ background: assignment.class.color }} />
+                {assignment.class.name}
+              </span>
+            )}
+            <span className={`text-[11px] font-medium ${status === 'late' ? 'text-red-500' : status === 'soon' ? 'text-amber-500' : 'text-muted-foreground'}`}>
+              {dueText}
+            </span>
+            {assignment.weight > 1 && (
+              <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                ×{assignment.weight} weight
+              </span>
+            )}
+          </div>
+
+          <div>
+            <h2 className="text-xl font-bold leading-tight sm:text-2xl">{assignment.title}</h2>
+            {assignment.description && (
+              <p className="mt-2 text-sm text-muted-foreground line-clamp-3">{assignment.description}</p>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center">
+            <Button variant="gradient" size="lg" onClick={onStart} className="sm:flex-shrink-0">
+              Let's do it <ArrowRight className="h-4 w-4" />
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Opens a workspace with AI help, notes, and the right tools for this assignment.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function HeroCard({ assignment, onStart }) {
   const status = assignmentStatus(assignment);
   const due = new Date(assignment.dueDate);
