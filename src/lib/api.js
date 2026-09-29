@@ -95,3 +95,7 @@ export const reviewCard = (setId, cardId, grade) =>
 
 // ---- Activity / streaks ----
 export const getStreakStats = (days = 30) => api(`/activity/streak?days=${days}`);
+
+// ---- Shared set saving ----
+export const saveSharedSet = (shareId, title) =>
+  api(`/share/${shareId}/save`, { method: 'POST', body: { title: title || undefined } });
