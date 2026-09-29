@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, CalendarDays, Timer, BookOpen, GraduationCap, Users, Moon, Sun, Contrast, LogOut, Music2, VolumeX, HelpCircle, Settings } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Timer, BookOpen, GraduationCap, Users, Moon, Sun, Contrast, LogOut, Music2, VolumeX, HelpCircle, Settings, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useApp } from '@/lib/store.jsx';
 import { useMusic } from '@/lib/music.jsx';
 import NotesChat from './NotesChat.jsx';
@@ -35,7 +35,7 @@ function MusicToggleButton() {
 }
 
 export default function Layout() {
-  const { user, logout, isDark, toggleDark, contrast, toggleContrast } = useApp();
+  const { user, logout, isDark, toggleDark, contrast, toggleContrast, sidebarOpen, toggleSidebar } = useApp();
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const link = ({ isActive }) =>
@@ -46,44 +46,112 @@ export default function Layout() {
         : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
     );
 
+  const linkCompact = ({ isActive }) =>
+    cn(
+      'flex items-center justify-center rounded-lg p-2.5 transition-colors',
+      isActive
+        ? 'bg-primary/10 text-primary'
+        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+    );
+
   return (
     <div className="min-h-screen md:flex">
       <a href="#main" className="skip-link">Skip to content</a>
 
-      <aside className="hidden md:flex md:w-64 md:flex-col border-r bg-card/60 backdrop-blur sticky top-0 h-screen no-print">
-        <div className="px-5 py-6">
-          <Logo />
+      <aside
+        className={cn(
+          'hidden md:flex md:flex-col border-r bg-card/60 backdrop-blur sticky top-0 h-screen no-print transition-[width] duration-200',
+          sidebarOpen ? 'md:w-64' : 'md:w-16'
+        )}
+      >
+        <div className={cn('flex items-center py-6', sidebarOpen ? 'justify-between px-5' : 'flex-col gap-3 px-2')}>
+          {sidebarOpen ? (
+            <>
+              <Logo />
+              <button
+                onClick={toggleSidebar}
+                className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                aria-label="Collapse sidebar"
+                title="Collapse sidebar"
+              >
+                <PanelLeftClose className="h-[18px] w-[18px]" />
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={toggleSidebar}
+                className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                aria-label="Expand sidebar"
+                title="Expand sidebar"
+              >
+                <PanelLeftOpen className="h-[18px] w-[18px]" />
+              </button>
+              <button
+                onClick={() => window.dispatchEvent(new CustomEvent('studysync:startTour'))}
+                className="block"
+                aria-label="StudySync"
+              >
+                <img src="/logo.png" alt="" className="h-8 w-8 object-contain" />
+              </button>
+            </>
+          )}
         </div>
-        <nav aria-label="Main" className="flex-1 space-y-1 px-3">
+
+        <nav aria-label="Main" className={cn('flex-1 space-y-1', sidebarOpen ? 'px-3' : 'px-2')}>
           {NAV.map(({ to, label, icon: Icon }) => (
-            <NavLink key={to} to={to} end={to === '/'} className={link}>
-              <Icon className="h-5 w-5" aria-hidden />
-              {label}
+            <NavLink
+              key={to}
+              to={to}
+              end={to === '/'}
+              className={sidebarOpen ? link : linkCompact}
+              title={!sidebarOpen ? label : undefined}
+            >
+              <Icon className="h-5 w-5 shrink-0" aria-hidden />
+              {sidebarOpen && <span>{label}</span>}
             </NavLink>
           ))}
         </nav>
-        <div className="border-t p-3 space-y-2.5">
-          <div className="px-2 text-[13px] text-muted-foreground truncate">
-            Signed in as <span className="font-medium text-foreground">{user?.name}</span>
-          </div>
-          <div className="flex gap-1">
-            <MusicToggleButton />
-            <Button variant="ghost" size="icon" onClick={toggleDark} aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'} title="Toggle dark mode">
-              {isDark ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
-            </Button>
-            <Button variant="ghost" size="icon" onClick={toggleContrast} aria-pressed={contrast} aria-label="Toggle high contrast" title="High contrast">
-              <Contrast className="h-[18px] w-[18px]" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={() => window.dispatchEvent(new CustomEvent('studysync:startTour'))} aria-label="Take a tour" title="Take a tour">
-              <HelpCircle className="h-[18px] w-[18px]" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)} aria-label="Settings" title="Settings">
-              <Settings className="h-[18px] w-[18px]" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={logout} aria-label="Log out" title="Log out" className="ml-auto">
-              <LogOut className="h-[18px] w-[18px]" />
-            </Button>
-          </div>
+
+        <div className={cn('border-t space-y-2.5', sidebarOpen ? 'p-3' : 'p-2')}>
+          {sidebarOpen ? (
+            <>
+              <div className="px-2 text-[13px] text-muted-foreground truncate">
+                Signed in as <span className="font-medium text-foreground">{user?.name}</span>
+              </div>
+              <div className="flex gap-1">
+                <MusicToggleButton />
+                <Button variant="ghost" size="icon" onClick={toggleDark} aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'} title="Toggle dark mode">
+                  {isDark ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
+                </Button>
+                <Button variant="ghost" size="icon" onClick={toggleContrast} aria-pressed={contrast} aria-label="Toggle high contrast" title="High contrast">
+                  <Contrast className="h-[18px] w-[18px]" />
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => window.dispatchEvent(new CustomEvent('studysync:startTour'))} aria-label="Take a tour" title="Take a tour">
+                  <HelpCircle className="h-[18px] w-[18px]" />
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)} aria-label="Settings" title="Settings">
+                  <Settings className="h-[18px] w-[18px]" />
+                </Button>
+                <Button variant="ghost" size="icon" onClick={logout} aria-label="Log out" title="Log out" className="ml-auto">
+                  <LogOut className="h-[18px] w-[18px]" />
+                </Button>
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col gap-1">
+              <MusicToggleButton />
+              <Button variant="ghost" size="icon" onClick={toggleDark} aria-label="Toggle dark mode" title="Toggle dark mode" className="mx-auto">
+                {isDark ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)} aria-label="Settings" title="Settings" className="mx-auto">
+                <Settings className="h-[18px] w-[18px]" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={logout} aria-label="Log out" title="Log out" className="mx-auto">
+                <LogOut className="h-[18px] w-[18px]" />
+              </Button>
+            </div>
+          )}
         </div>
       </aside>
 
@@ -113,8 +181,7 @@ export default function Layout() {
       <nav aria-label="Main mobile" className="md:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-6 border-t glass no-print">
         {NAV.map(({ to, label, icon: Icon }) => (
           <NavLink key={to} to={to} end={to === '/'} className={({ isActive }) => cn('flex flex-col items-center gap-0.5 py-2 text-[10px]', isActive ? 'text-primary' : 'text-muted-foreground')}>
-            <Icon className="h-5 w-5" aria-hidden />
-            {label}
+            <Icon className="h-5 w-5" aria-hidden />{label}
           </NavLink>
         ))}
       </nav>
