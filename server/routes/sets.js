@@ -127,8 +127,21 @@ setRoutes.get('/', wrap(async (req, res) => {
   res.json(sets);
 }));
 
-setRoutes.post('/', validate(z.object({ title: z.string().trim().min(1).max(100), content: z.string().max(200000).optional() })), wrap(async (req, res) => {
-  const set = await prisma.studySet.create({ data: { title: req.body.title, content: req.body.content || '', userId: req.user.id } });
+setRoutes.post('/', validate(z.object({
+  title: z.string().trim().min(1).max(100),
+  content: z.string().max(200000).optional(),
+  cards: z.array(cardSchema).max(200).optional(),
+})), wrap(async (req, res) => {
+  const { title, content, cards } = req.body;
+  const set = await prisma.studySet.create({
+    data: {
+      title,
+      content: content || '',
+      userId: req.user.id,
+      ...(cards?.length ? { cards: { create: cards } } : {}),
+    },
+    include: { cards: true },
+  });
   res.status(201).json(set);
 }));
 
@@ -151,11 +164,13 @@ setRoutes.put('/:id', validate(z.object({
   unitName: z.string().trim().max(80).nullable().optional(),
 })), wrap(async (req, res) => {
   const data = { ...req.body };
-  // Normalize empty strings to null so the relation clears cleanly
   if (data.classId === '') data.classId = null;
   if (data.unitName === '') data.unitName = null;
 
-  const result = await prisma.studySet.updateMany({ where: { id: req.params.id, userId: req.user.id }, data });
+  const result = await prisma.studySet.updateMany({
+    where: { id: req.params.id, userId: req.user.id },
+    data,
+  });
   if (!result.count) return res.status(404).json({ error: 'Study set not found' });
   res.json(await prisma.studySet.findUnique({
     where: { id: req.params.id },
@@ -167,7 +182,9 @@ setRoutes.put('/:id', validate(z.object({
 }));
 
 setRoutes.delete('/:id', wrap(async (req, res) => {
-  const result = await prisma.studySet.deleteMany({ where: { id: req.params.id, userId: req.user.id } });
+  const result = await prisma.studySet.deleteMany({
+    where: { id: req.params.id, userId: req.user.id },
+  });
   if (!result.count) return res.status(404).json({ error: 'Study set not found' });
   res.status(204).end();
 }));
@@ -217,8 +234,10 @@ setRoutes.delete('/:id/cards/:cardId', wrap(async (req, res) => {
   res.status(204).end();
 }));
 
-// ---------- Public share route (no auth) ----------
+/* ---------- Public share routes (no auth required for reads) ---------- */
+
 export const shareRoutes = Router();
+
 shareRoutes.get('/:shareId', wrap(async (req, res) => {
   const set = await prisma.studySet.findUnique({
     where: { shareId: req.params.shareId },
@@ -226,4 +245,37 @@ shareRoutes.get('/:shareId', wrap(async (req, res) => {
   });
   if (!set) return res.status(404).json({ error: 'This shared set does not exist' });
   res.json({ id: set.id, title: set.title, content: set.content, cards: set.cards, author: set.user.name });
+}));
+
+// Save a shared set into your own account — creates a personal copy
+shareRoutes.post('/:shareId/save', requireAuth, wrap(async (req, res) => {
+  const source = await prisma.studySet.findUnique({
+    where: { shareId: req.params.shareId },
+    include: { cards: true },
+  });
+  if (!source) return res.status(404).json({ error: 'This shared set no longer exists' });
+
+  const newTitle = String(req.body?.title || source.title || 'Shared set').trim().slice(0, 100) || 'Shared set';
+
+  // If this user already has a set with the same title, return it rather than
+  // creating a duplicate.
+  const existing = await prisma.studySet.findFirst({
+    where: { userId: req.user.id, title: newTitle },
+    include: { cards: true },
+  });
+  if (existing) {
+    return res.json({ set: existing, copied: false, message: 'Already in your library' });
+  }
+
+  const created = await prisma.studySet.create({
+    data: {
+      title: newTitle,
+      content: source.content || '',
+      userId: req.user.id,
+      cards: { create: source.cards.map((c) => ({ front: c.front, back: c.back })) },
+    },
+    include: { cards: true },
+  });
+
+  res.json({ set: created, copied: true });
 }));
