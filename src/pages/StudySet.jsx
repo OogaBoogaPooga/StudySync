@@ -339,6 +339,7 @@ export function StudyMode({ cards, setId, onClose, onCardReviewed }) {
   const [flipped, setFlipped] = useState(false);
   const [busy, setBusy] = useState(false);
   const [reviewedCount, setReviewedCount] = useState(0);
+  const [saveError, setSaveError] = useState('');
 
   const now = new Date();
   const isDue = (c) => !c.dueAt || new Date(c.dueAt) <= now;
@@ -365,23 +366,30 @@ export function StudyMode({ cards, setId, onClose, onCardReviewed }) {
   const progress = queue.length ? (i / queue.length) * 100 : 0;
 
   const rate = async (grade) => {
-    if (busy || !current || !setId) return;
+    if (busy || !current) return;
     setBusy(true);
-    try {
-      const updated = await reviewCard(setId, current.id, grade);
-      onCardReviewed?.(updated);
-      setReviewedCount((n) => n + 1);
-      setFlipped(false);
-      if (i + 1 >= queue.length) {
-        setMode('done');
-      } else {
-        setI(i + 1);
+    setSaveError('');
+
+    // Only attempt the SRS write if this set has an id AND we were given one.
+    // Otherwise, just advance — the study session still works.
+    if (setId) {
+      try {
+        const updated = await reviewCard(setId, current.id, grade);
+        onCardReviewed?.(updated);
+      } catch (e) {
+        console.error('[StudyMode] review save failed:', e);
+        setSaveError(e?.message || 'Could not save review');
       }
-    } catch {
-      // silently skip; card stays in queue
-    } finally {
-      setBusy(false);
     }
+
+    setReviewedCount((n) => n + 1);
+    setFlipped(false);
+    if (i + 1 >= queue.length) {
+      setMode('done');
+    } else {
+      setI(i + 1);
+    }
+    setBusy(false);
   };
 
   useEffect(() => {
@@ -489,6 +497,12 @@ export function StudyMode({ cards, setId, onClose, onCardReviewed }) {
           <div className="mt-4 flex justify-center">
             <Button variant="gradient" onClick={() => setFlipped(true)}>Show answer</Button>
           </div>
+        )}
+
+        {saveError && (
+          <p className="mt-3 text-center text-[11px] text-destructive">
+            Couldn't save this review ({saveError}). Your progress through the session still counts.
+          </p>
         )}
 
         <p className="mt-3 text-center text-[10px] text-muted-foreground">
