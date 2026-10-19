@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, CalendarDays, Timer, BookOpen, GraduationCap, Users, Moon, Sun, Contrast, LogOut, Music2, VolumeX, HelpCircle, Settings, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Timer, BookOpen, GraduationCap, Users, Moon, Sun, Contrast, LogOut, Music2, VolumeX, HelpCircle, Settings, PanelLeftClose, PanelLeftOpen, Gamepad2 } from 'lucide-react';
 import { useApp } from '@/lib/store.jsx';
 import { useMusic } from '@/lib/music.jsx';
 import NotesChat from './NotesChat.jsx';
@@ -17,6 +17,7 @@ const NAV = [
   { to: '/notes', label: 'Notes', icon: BookOpen },
   { to: '/grades', label: 'Grades', icon: GraduationCap },
   { to: '/rooms', label: 'Rooms', icon: Users },
+  { to: '/games', label: 'Games', icon: Gamepad2 },
 ];
 
 function MusicToggleButton() {
@@ -178,7 +179,7 @@ export default function Layout() {
         <Outlet />
       </main>
 
-      <nav aria-label="Main mobile" className="md:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-6 border-t glass no-print">
+      <nav aria-label="Main mobile" className="md:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-7 border-t glass no-print">
         {NAV.map(({ to, label, icon: Icon }) => (
           <NavLink key={to} to={to} end={to === '/'} className={({ isActive }) => cn('flex flex-col items-center gap-0.5 py-2 text-[10px]', isActive ? 'text-primary' : 'text-muted-foreground')}>
             <Icon className="h-5 w-5" aria-hidden />{label}
