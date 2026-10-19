@@ -2,14 +2,63 @@ import { useEffect, useMemo, useState } from 'react';
 import { Gamepad2, Search, X, ExternalLink, ArrowLeft, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button.jsx';
 import { Input } from '@/components/ui/input.jsx';
-import { cn } from '@/lib/utils';
 
-// 3kh0-lite hosts every game file on GitHub Pages and exposes a public
-// games.json. This is the practical way to pull in the full archive without
-// iframing the main 3kh0 site (which many districts block).
 const GAMES_JSON = 'https://raw.githubusercontent.com/DopeSkinnyKid27/3kh0-lite/main/config/games.json';
 const BASE_URL = 'https://dopeskinnykid27.github.io/3kh0-lite/';
 const CREDIT_URL = 'https://github.com/3kh0/3kh0-Assets';
+
+// A built-in fallback list of the most popular games. If the GitHub fetch
+// fails or the upstream JSON has a syntax error, the arcade still works.
+const FALLBACK_GAMES = [
+  { title: '2048', link: 'projects/2048/index.html', img: '' },
+  { title: 'Slope', link: 'projects/slope/index.html', img: '' },
+  { title: 'Retro Bowl', link: 'projects/retro-bowl/index.html', img: '' },
+  { title: 'Drive Mad', link: 'projects/drive-mad/index.html', img: '' },
+  { title: '1v1.LOL', link: 'projects/1v1-lol/index.html', img: '' },
+  { title: 'Basketball Stars', link: 'projects/basketball-stars/index.html', img: '' },
+  { title: 'Among Us', link: 'projects/among-us/index.html', img: '' },
+  { title: 'Moto X3M', link: 'projects/moto-x3m/index.html', img: '' },
+  { title: 'Tunnel Rush', link: 'projects/tunnel-rush/index.html', img: '' },
+  { title: 'Run 3', link: 'projects/run-3/index.html', img: '' },
+  { title: 'BitLife', link: 'projects/bitlife/index.html', img: '' },
+  { title: 'OvO', link: 'projects/ovo/index.html', img: '' },
+  { title: 'Rooftop Snipers', link: 'projects/rooftop-snipers/index.html', img: '' },
+  { title: 'Monkey Mart', link: 'projects/monkey-mart/index.html', img: '' },
+  { title: 'Paper.io 2', link: 'projects/paperio2/index.html', img: '' },
+  { title: 'Temple Run 2', link: 'projects/temple-run-2/index.html', img: '' },
+  { title: 'Subway Surfers', link: 'projects/subway-surfers/index.html', img: '' },
+  { title: 'Granny', link: 'projects/granny/index.html', img: '' },
+  { title: 'Minecraft Classic', link: 'projects/minecraft-classic/index.html', img: '' },
+  { title: 'Vex 3', link: 'projects/vex-3/index.html', img: '' },
+  { title: 'Doodle Jump', link: 'projects/doodle-jump/index.html', img: '' },
+  { title: 'Friday Night Funkin', link: 'projects/friday-night-funkin/index.html', img: '' },
+  { title: 'Geometry Dash', link: 'projects/geometry-dash/index.html', img: '' },
+  { title: 'Bad Ice Cream', link: 'projects/bad-ice-cream/index.html', img: '' },
+  { title: 'Shell Shockers', link: 'projects/shell-shockers/index.html', img: '' },
+  { title: 'Smash Karts', link: 'projects/smash-karts/index.html', img: '' },
+  { title: 'Crossy Road', link: 'projects/crossy-road/index.html', img: '' },
+  { title: 'Cut the Rope', link: 'projects/cut-the-rope/index.html', img: '' },
+  { title: 'Candy Crush', link: 'projects/candy-crush/index.html', img: '' },
+  { title: 'Bubble Shooter', link: 'projects/bubble-shooter/index.html', img: '' },
+];
+
+// Robust parser for 3kh0's games.json. Handles:
+//  - valid JSON
+//  - JSON with trailing commas
+//  - a JS file like "const games = [...]"
+function parseGames(raw) {
+  const attempt = (str) => JSON.parse(str.replace(/,\s*([\]}])/g, '$1'));
+
+  // Try as-is
+  try { return attempt(raw); } catch {}
+  // Try extracting the array if it's wrapped in JS (e.g. "const games = [...]")
+  const start = raw.indexOf('[');
+  const end = raw.lastIndexOf(']');
+  if (start !== -1 && end > start) {
+    try { return attempt(raw.slice(start, end + 1)); } catch {}
+  }
+  throw new Error('Could not parse the game list.');
+}
 
 export default function Games() {
   const [games, setGames] = useState(null);
@@ -24,9 +73,19 @@ export default function Games() {
     fetch(GAMES_JSON)
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
+        return r.text();
       })
-      .then((data) => {
+      .then((text) => {
+        let data;
+        try {
+          data = parseGames(text);
+        } catch (e) {
+          console.warn('[Games] Upstream JSON parse failed, using fallback:', e.message);
+          setGames(FALLBACK_GAMES);
+          setError('Loaded built-in games (GitHub list is temporarily broken).');
+          return;
+        }
+
         const cleaned = (Array.isArray(data) ? data : [])
           .filter((g) => g && g.title && g.link)
           .map((g) => ({
@@ -34,9 +93,20 @@ export default function Games() {
             link: String(g.link).trim(),
             img: g.imgSrc ? String(g.imgSrc).trim() : '',
           }));
+
+        if (cleaned.length === 0) {
+          setGames(FALLBACK_GAMES);
+          setError('Loaded built-in games (GitHub returned an empty list).');
+          return;
+        }
+
         setGames(cleaned);
       })
-      .catch((e) => setError(e.message || 'Could not load the game list.'));
+      .catch((e) => {
+        console.warn('[Games] Fetch failed, using fallback:', e.message);
+        setGames(FALLBACK_GAMES);
+        setError('Loaded built-in games (network blocked).');
+      });
   };
 
   useEffect(() => {
@@ -114,7 +184,7 @@ export default function Games() {
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {games
-              ? `${games.length} unblocked games for your study breaks.`
+              ? `${games.length} games to play on your break.`
               : 'Loading the game library…'}
           </p>
         </div>
@@ -143,16 +213,24 @@ export default function Games() {
         />
       </div>
 
+      {/* Subtle error/fallback banner */}
+      {error && games && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
+          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+          <p>{error}</p>
+        </div>
+      )}
+
       {/* Loading */}
       {!games && !error && (
         <div className="flex h-64 flex-col items-center justify-center gap-3 rounded-xl border border-dashed">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Fetching {`~250`} games from GitHub…</p>
+          <p className="text-sm text-muted-foreground">Fetching games from GitHub…</p>
         </div>
       )}
 
-      {/* Error */}
-      {error && (
+      {/* Hard error (should not happen anymore since we fall back, but keep it) */}
+      {error && !games && (
         <div className="flex h-64 flex-col items-center justify-center gap-3 rounded-xl border border-destructive/40 bg-destructive/5 p-6 text-center">
           <AlertCircle className="h-8 w-8 text-destructive" />
           <div>
@@ -163,14 +241,6 @@ export default function Games() {
             <Button variant="outline" size="sm" onClick={loadGames}>
               <RefreshCw className="h-3.5 w-3.5" /> Retry
             </Button>
-            <a
-              href="https://lite.3kh0.net"
-              target="_blank"
-              rel="noreferrer noopener"
-              className="inline-flex h-8 items-center gap-1 rounded-md border px-3 text-xs text-muted-foreground hover:bg-accent"
-            >
-              <ExternalLink className="h-3.5 w-3.5" /> Open 3kh0 directly
-            </a>
           </div>
         </div>
       )}
