@@ -1,8 +1,7 @@
-import { useMemo, useState } from 'react';
-import { Gamepad2, Search, X, ExternalLink, ArrowLeft } from 'lucide-react';
+import { useMemo, useState, useRef, useEffect } from 'react';
+import { Gamepad2, Search, X, ExternalLink, ArrowLeft, Maximize2, Minimize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button.jsx';
 import { Input } from '@/components/ui/input.jsx';
-import { cn } from '@/lib/utils';
 import GAMES_DATA from '@/lib/games.json';
 
 const PLAY_BASE = '/play/';
@@ -11,6 +10,14 @@ export default function Games() {
   const [search, setSearch] = useState('');
   const [active, setActive] = useState(null);
   const [loading, setLoading] = useState(false);
+  const iframeRef = useRef(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const onFsChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onFsChange);
+    return () => document.removeEventListener('fullscreenchange', onFsChange);
+  }, []);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -24,10 +31,22 @@ export default function Games() {
   };
 
   const closeGame = () => {
+    if (document.fullscreenElement) document.exitFullscreen();
     setActive(null);
     setLoading(false);
   };
 
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      iframeRef.current?.requestFullscreen().catch((err) => {
+        console.error('Error attempting to enable fullscreen:', err);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  };
+
+  // Player overlay
   if (active) {
     return (
       <div className="fixed inset-0 z-[200] flex flex-col bg-background">
@@ -38,11 +57,15 @@ export default function Games() {
           </Button>
           <p className="min-w-0 truncate text-sm font-medium">{active.title}</p>
           <div className="flex gap-1">
+            <Button variant="ghost" size="icon" onClick={toggleFullscreen} title="Fullscreen">
+              {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </Button>
             <a
               href={active.url}
               target="_blank"
               rel="noreferrer noopener"
               className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+              title="Open in new tab"
             >
               <ExternalLink className="h-3.5 w-3.5" />
               New tab
@@ -60,6 +83,7 @@ export default function Games() {
             </div>
           )}
           <iframe
+            ref={iframeRef}
             src={active.url}
             title={active.title}
             className="h-full w-full border-0"
@@ -99,18 +123,7 @@ export default function Games() {
 
       <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
         {filtered.map((game) => (
-          <button
-            key={game.slug}
-            onClick={() => openGame(game)}
-            className="group overflow-hidden rounded-xl border bg-card text-left transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
-          >
-            <div className="relative flex aspect-square items-center justify-center bg-gradient-to-br from-primary/10 to-primary/5">
-              <Gamepad2 className="h-8 w-8 text-primary/40 transition-transform duration-300 group-hover:scale-110" />
-            </div>
-            <div className="p-2.5">
-              <p className="truncate text-sm font-medium leading-tight">{game.title}</p>
-            </div>
-          </button>
+          <GameCard key={game.slug} game={game} onOpen={() => openGame(game)} />
         ))}
         {filtered.length === 0 && (
           <div className="col-span-full rounded-xl border border-dashed py-12 text-center">
@@ -119,5 +132,35 @@ export default function Games() {
         )}
       </div>
     </div>
+  );
+}
+
+function GameCard({ game, onOpen }) {
+  const [imgError, setImgError] = useState(false);
+  // Thumbnails are usually located at /projects/<slug>/thumb.png locally
+  const thumbUrl = `${PLAY_BASE}${game.slug}/thumb.png`;
+
+  return (
+    <button
+      onClick={onOpen}
+      className="group overflow-hidden rounded-xl border bg-card text-left transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+    >
+      <div className="relative flex aspect-square items-center justify-center overflow-hidden bg-gradient-to-br from-primary/10 to-primary/5">
+        {!imgError ? (
+          <img
+            src={thumbUrl}
+            alt={game.title}
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
+            onError={() => setImgError(true)}
+            loading="lazy"
+          />
+        ) : (
+          <Gamepad2 className="h-8 w-8 text-primary/40 transition-transform duration-300 group-hover:scale-110" />
+        )}
+      </div>
+      <div className="p-2.5">
+        <p className="truncate text-sm font-medium leading-tight">{game.title}</p>
+      </div>
+    </button>
   );
 }
