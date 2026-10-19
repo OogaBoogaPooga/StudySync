@@ -1,151 +1,67 @@
-generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["driverAdapters"]
-}
-
-datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
-}
-
-model User {
-  id          String         @id @default(cuid())
-  email       String         @unique
-  name        String
-  password    String
-  createdAt   DateTime       @default(now())
-  classes     Class[]
-  assignments Assignment[]
-  sessions    StudySession[]
-  studySets   StudySet[]
-  chatMessages ChatMessage[]
-  quizzes      Quiz[]
-  quizAttempts QuizAttempt[]
-
-  icDistrict        String?
-  icState           String?
-  icUsername        String?
-  icPasswordEnc     String?
-  icLastSync        DateTime?
-  icPortalUrl       String?
-  icWorkingEndpoint String?
-}
-
-model Class {
-  id          String       @id @default(cuid())
-  name        String
-  color       String       @default("#6366f1")
-  credits     Float        @default(3)
-  userId      String
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  assignments Assignment[]
-  studySets   StudySet[]
-
-  snapshotScore     Float?
-  snapshotMax       Float?
-  snapshotUpdatedAt DateTime?
-  snapshotSource    String?
-}
-
-model Assignment {
-  id          String   @id @default(cuid())
-  title       String
-  description String?
-  dueDate     DateTime
-  progress    Int      @default(0)
-  completed   Boolean  @default(false)
-  score       Float?
-  maxScore    Float    @default(100)
-  weight      Float    @default(1)
-  type        String?
-  classId     String?
-  class       Class?   @relation(fields: [classId], references: [id], onDelete: SetNull)
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
-  aiAnalysis   String?
-  rubricText   String?
-  taskPlan     String?
-  taskProgress String?
-}
-
-model StudySession {
-  id          String   @id @default(cuid())
-  type        String   @default("focus")
-  durationMin Int
-  notes       String?
-  startedAt   DateTime @default(now())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model StudySet {
-  id        String      @id @default(cuid())
-  title     String
-  content   String      @default("")
-  shareId   String      @unique @default(cuid())
-  userId    String
-  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  cards     Flashcard[]
-  chatMessages ChatMessage[]
-  quizzes      Quiz[]
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-
-  classId  String?
-  class    Class?  @relation(fields: [classId], references: [id], onDelete: SetNull)
-  unitName String?
-
-  lessonPlan     String?
-  lessonProgress String?
-}
-
-model Flashcard {
-  id    String   @id @default(cuid())
-  front String
-  back  String
-  setId String
-  set   StudySet @relation(fields: [setId], references: [id], onDelete: Cascade)
-
-  dueAt          DateTime?
-  interval       Float    @default(0)
-  ease           Float    @default(2.5)
-  reps           Int      @default(0)
-  lapses         Int      @default(0)
-  state          String   @default("new")
-  lastReviewedAt DateTime?
-}
-
-model ChatMessage {
-  id        String    @id @default(cuid())
-  userId    String
-  setId     String?
-  role      String
-  content   String
-  createdAt DateTime  @default(now())
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  set       StudySet? @relation(fields: [setId], references: [id], onDelete: Cascade)
-}
-
-model Quiz {
-  id        String        @id @default(cuid())
-  setId     String
-  userId    String
-  questions String
-  createdAt DateTime      @default(now())
-  set       StudySet      @relation(fields: [setId], references: [id], onDelete: Cascade)
-  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  attempts  QuizAttempt[]
-}
-
-model QuizAttempt {
-  id        String   @id @default(cuid())
-  quizId    String
-  userId    String
-  score     Int
-  total     Int
-  answers   String
-  createdAt DateTime @default(now())
-  quiz      Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+{
+  "name": "studysync",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Collaborative study companion and assignment manager",
+  "scripts": {
+    "dev": "concurrently -n server,client -c blue,magenta \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "nodemon server/index.js",
+    "dev:client": "vite",
+    "build": "prisma generate && vite build",
+    "start": "node server/index.js",
+    "db:setup": "prisma db push && node seed.js",
+    "db:reset": "prisma db push --force-reset && node seed.js",
+    "postinstall": "prisma generate"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.8.1",
+    "@prisma/adapter-libsql": "^5.22.0",
+    "@prisma/client": "^5.19.0",
+    "@radix-ui/react-dialog": "^1.1.1",
+    "@tiptap/extension-collaboration": "^2.10.0",
+    "@tiptap/extension-collaboration-cursor": "^2.10.0",
+    "@tiptap/extension-link": "^2.10.0",
+    "@tiptap/extension-placeholder": "^2.10.0",
+    "@tiptap/extension-underline": "^2.10.0",
+    "@tiptap/pm": "^2.10.0",
+    "@tiptap/react": "^2.10.0",
+    "@tiptap/starter-kit": "^2.10.0",
+    "bcryptjs": "^2.4.3",
+    "chart.js": "^4.4.4",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
+    "cors": "^2.8.5",
+    "date-fns": "^3.6.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "fabric": "^6.4.0",
+    "jsonwebtoken": "^9.0.2",
+    "lucide-react": "^0.441.0",
+    "mammoth": "^1.8.0",
+    "multer": "^1.4.5-lts.1",
+    "officeparser": "^4.1.1",
+    "pdf2json": "^3.1.2",
+    "react": "^18.3.1",
+    "react-chartjs-2": "^5.2.0",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2",
+    "socket.io": "^4.7.5",
+    "socket.io-client": "^4.7.5",
+    "tailwind-merge": "^2.5.2",
+    "y-protocols": "^1.0.6",
+    "yjs": "^13.6.20",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.20",
+    "concurrently": "^8.2.2",
+    "nodemon": "^3.1.4",
+    "postcss": "^8.4.47",
+    "prisma": "^5.19.0",
+    "tailwindcss": "^3.4.12",
+    "vite": "^5.4.6",
+    "vite-plugin-pwa": "^0.20.5"
+  }
 }
