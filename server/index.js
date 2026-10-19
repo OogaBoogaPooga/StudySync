@@ -50,7 +50,9 @@ app.use('/api/quizzes', quizzesRoutes);
 app.use('/api/ic', infiniteCampusRoutes);
 app.use('/api/activity', activityRoutes);
 
-app.use('/api/music', express.static('/data/music', { maxAge: '7d', immutable: true }));
+// Serve music and games from the public folder
+app.use('/api/music', express.static(path.join(__dirname, '..', 'public', 'music'), { maxAge: '7d', immutable: true }));
+app.use('/play', express.static(path.join(__dirname, '..', 'public', 'games'), { maxAge: '7d', immutable: true }));
 
 if (process.env.NODE_ENV === 'production') {
   const dist = path.join(__dirname, '..', 'dist');
