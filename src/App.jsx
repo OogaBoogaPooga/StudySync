@@ -19,8 +19,9 @@ const Grades = lazy(() => import('./pages/Grades.jsx'));
 const Rooms = lazy(() => import('./pages/Rooms.jsx'));
 const Room = lazy(() => import('./pages/Room.jsx'));
 const Quiz = lazy(() => import('./pages/Quiz.jsx'));
-const AssignmentWorkspace = lazy(() => import('./pages/AssignmentWorkspace.jsx')); 
+const AssignmentWorkspace = lazy(() => import('./pages/AssignmentWorkspace.jsx'));
 const Learn = lazy(() => import('./pages/Learn.jsx'));
+const Games = lazy(() => import('./pages/Games.jsx'));
 
 const Spinner = () => (
   <div className="flex h-[60vh] items-center justify-center" role="status" aria-label="Loading">
@@ -47,13 +48,14 @@ export default function App() {
               <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/focus" element={<Focus />} />
               <Route path="/notes" element={<Notes />} />
-              <Route path="/notes/:id" element={<StudySet />} /> 
+              <Route path="/notes/:id" element={<StudySet />} />
               <Route path="/learn/:setId" element={<Learn />} />
               <Route path="/work/:id" element={<AssignmentWorkspace />} />
               <Route path="/quiz/:id" element={<Quiz />} />
               <Route path="/grades" element={<Grades />} />
               <Route path="/rooms" element={<Rooms />} />
               <Route path="/rooms/:code" element={<Room />} />
+              <Route path="/games" element={<Games />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
