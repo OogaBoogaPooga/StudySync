@@ -9,6 +9,6 @@ const libsql = createClient({
 
 const adapter = new PrismaLibSQL(libsql);
 
-// Single shared Prisma instance (avoids exhausting connections during dev reloads)
+// Single shared Prisma instance
 export const prisma = globalThis.__prisma || new PrismaClient({ adapter });
 if (process.env.NODE_ENV !== 'production') globalThis.__prisma = prisma;
