@@ -29,9 +29,10 @@ export default defineConfig({
       workbox: {
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//, /^\/socket\.io\//, /^\/play\//],
-        // Ignore the games folder so the PWA doesn't try to cache 800MB of games
-        globPatterns: ['**/*.{js,css,html,svg,png,jpg,jpeg,ico,woff2}', '!games/**'],
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB limit just in case
+        globPatterns: ['**/*.{js,css,html,svg,png,jpg,jpeg,ico,woff2}'],
+        // THE FIX: Explicitly ignore the games folder so Workbox doesn't crash on the big files
+        globIgnores: ['**/games/**'],
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         runtimeCaching: [
           {
             urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
