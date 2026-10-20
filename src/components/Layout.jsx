@@ -93,6 +93,7 @@ export default function Layout() {
         <NavLink to="/" onClick={onNavigate}>
           <Logo size={compact ? 'sm' : 'md'} compact={compact} />
         </NavLink>
+        {/* Collapse button (only when open) */}
         {!compact && (
           <Button variant="ghost" size="icon" onClick={toggleSidebar} title="Collapse sidebar" className="hidden md:inline-flex">
             <PanelLeftClose className="h-4 w-4" />
@@ -100,7 +101,16 @@ export default function Layout() {
         )}
       </div>
 
-      <nav className={cn('flex-1 space-y-1 overflow-y-auto p-2', compact && 'px-1')}>
+      {/* Expand button (only when collapsed) */}
+      {compact && (
+        <div className="flex justify-center pt-2 pb-1">
+          <Button variant="ghost" size="icon" onClick={toggleSidebar} title="Expand sidebar" className="hidden md:inline-flex">
+            <PanelLeftOpen className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
+      <nav className={cn('flex-1 space-y-1 overflow-y-auto p-2', compact && 'px-1 mt-2')}>
         {NAV.map(({ to, label, icon: Icon }) => (
           <NavLink key={to} to={to} end={to === '/'} onClick={onNavigate} className={compact ? iconLinkClass : linkClass} title={compact ? label : undefined}>
             <Icon className="h-[18px] w-[18px] shrink-0" />
