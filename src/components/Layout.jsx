@@ -93,7 +93,6 @@ export default function Layout() {
         <NavLink to="/" onClick={onNavigate}>
           <Logo size={compact ? 'sm' : 'md'} compact={compact} />
         </NavLink>
-        {/* Collapse button (only when open) */}
         {!compact && (
           <Button variant="ghost" size="icon" onClick={toggleSidebar} title="Collapse sidebar" className="hidden md:inline-flex">
             <PanelLeftClose className="h-4 w-4" />
@@ -101,7 +100,6 @@ export default function Layout() {
         )}
       </div>
 
-      {/* Expand button (only when collapsed) */}
       {compact && (
         <div className="flex justify-center pt-2 pb-1">
           <Button variant="ghost" size="icon" onClick={toggleSidebar} title="Expand sidebar" className="hidden md:inline-flex">
@@ -119,14 +117,19 @@ export default function Layout() {
         ))}
       </nav>
 
-      <div className={cn('border-t p-2 space-y-1', compact && 'flex flex-col items-center')}>
-        <div className={cn('flex items-center gap-1 px-1', compact && 'flex-col')}>
-          {!compact && (
-            <div className="flex-1 min-w-0 px-2">
-              <p className="truncate text-sm font-medium">{user?.name || 'Student'}</p>
-              <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
-            </div>
-          )}
+      {/* Fixed Footer Layout */}
+      <div className={cn('border-t border-border/50 p-3', compact ? 'flex flex-col items-center space-y-2' : 'space-y-3')}>
+        
+        {/* User info on its own row so it doesn't get squished */}
+        {!compact && (
+          <div className="min-w-0 px-1">
+            <p className="truncate text-sm font-semibold leading-tight">{user?.name || 'Student'}</p>
+            <p className="truncate text-[11px] text-muted-foreground mt-0.5">{user?.email}</p>
+          </div>
+        )}
+
+        {/* Buttons laid out evenly below */}
+        <div className={cn('flex items-center gap-1', compact ? 'flex-col' : 'justify-between')}>
           <MusicToggleButton />
           <Button variant="ghost" size="icon" onClick={toggleDark} aria-label="Toggle dark mode" title={isDark ? 'Light mode' : 'Dark mode'}>
             {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
