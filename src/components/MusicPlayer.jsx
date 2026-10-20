@@ -12,7 +12,14 @@ import { cn } from '@/lib/utils';
 
 // Shared styles so the Pill and the Panel match perfectly
 const GLASS_BASE = "bg-white/10 dark:bg-black/40 backdrop-blur-[40px] backdrop-saturate-[180%] border border-white/20 dark:border-white/10 shadow-[0_16px_48px_-12px_rgba(0,0,0,0.6),inset_0_1px_1px_rgba(255,255,255,0.3)] relative overflow-hidden";
-const GRADIENT_SPLASH = "absolute inset-0 -z-10 bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-pink-500/20 blur-2xl pointer-events-none";
+
+// The "Splash" - Two glowing orbs that sit behind the glass to create the colored tint
+const LIGHTING_ORBS = (
+  <>
+    <div className="absolute -top-12 -left-12 h-40 w-40 rounded-full bg-blue-500/30 blur-[50px] pointer-events-none" />
+    <div className="absolute -bottom-12 -right-12 h-40 w-40 rounded-full bg-purple-500/20 blur-[50px] pointer-events-none" />
+  </>
+);
 
 export default function MusicPlayer() {
   const m = useMusic();
@@ -80,7 +87,7 @@ export default function MusicPlayer() {
             expanded ? 'max-h-[50vh] opacity-100 scale-100 translate-y-0' : 'max-h-0 opacity-0 pointer-events-none scale-95 translate-y-4 border-transparent shadow-none'
           )}
         >
-          <div className={GRADIENT_SPLASH} />
+          {LIGHTING_ORBS}
           <div className="p-3 space-y-1 relative z-10">
             <div className="flex items-center justify-between px-1 pb-1">
               <p className="text-[10px] font-bold text-white/60 tracking-wider uppercase drop-shadow-sm">Up Next</p>
@@ -145,8 +152,8 @@ export default function MusicPlayer() {
             GLASS_BASE
           )}
         >
-          {/* This is the "splash of color" behind the glass */}
-          <div className={GRADIENT_SPLASH} />
+          {/* The exact same lighting orbs as the panel above */}
+          {LIGHTING_ORBS}
 
           <button
             onClick={() => setExpanded(!expanded)}
@@ -156,10 +163,10 @@ export default function MusicPlayer() {
             <ChevronUp className={cn('h-4 w-4 transition-transform duration-300', expanded && 'rotate-180')} />
           </button>
 
-          {/* Elevated Album Art */}
+          {/* Elevated Album Art (Pops off the background) */}
           <div 
             className="relative z-10 h-12 w-12 shrink-0 rounded-full overflow-hidden flex items-center justify-center 
-            shadow-[0_8px_24px_rgba(0,0,0,0.5)] ring-2 ring-white/30 border border-black/20 
+            shadow-[0_8px_24px_rgba(0,0,0,0.6)] ring-2 ring-white/40 border border-black/20 
             transition-transform duration-300 hover:scale-105"
             style={{ background: coverImage ? undefined : coverGradient }}
           >
