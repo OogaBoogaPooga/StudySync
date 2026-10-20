@@ -57,7 +57,7 @@ export default function App() {
               <Route path="assignment/:id" element={<AssignmentWorkspace />} />
               <Route path="learn/:id" element={<Learn />} />
               <Route
-                path="recess"
+                path="study"
                 element={
                   <GamesGuard>
                     <Games />
