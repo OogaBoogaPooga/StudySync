@@ -1,12 +1,12 @@
+/**
+ * 25 study tracks from Open Lo-Fi (github.com/btahir/open-lofi).
+ * CC0 1.0 Universal — public domain, no attribution required.
+ * Hosted on jsDelivr CDN so they work without local downloads.
+ */
+const BASE_URL = 'https://cdn.jsdelivr.net/gh/btahir/open-lofi@main/public/music/';
+
 export const TRACKS = [
-  { 
-    id: 't01', 
-    title: '2 AM Debug Loop', 
-    artist: 'Open Lo-Fi', 
-    url: '2-am-debug-loop.mp3', 
-    mood: 'Focus',
-    // Add real image URLs here later if you want: image: '/covers/debug.jpg'
-  },
+  { id: 't01', title: '2 AM Debug Loop',          artist: 'Open Lo-Fi', url: '2-am-debug-loop.mp3',          mood: 'Focus' },
   { id: 't02', title: 'Brushstrokes and Rain',     artist: 'Open Lo-Fi', url: 'brushstrokes-and-rain.mp3',     mood: 'Rain' },
   { id: 't03', title: 'Butter and Windowlight',    artist: 'Open Lo-Fi', url: 'butter-and-windowlight.mp3',    mood: 'Morning' },
   { id: 't04', title: 'Chapter By Lamplight',      artist: 'Open Lo-Fi', url: 'chapter-by-lamplight.mp3',      mood: 'Reading' },
@@ -35,7 +35,8 @@ export const TRACKS = [
 
 export const MOODS = ['All', 'Focus', 'Morning', 'Reading', 'Chill', 'Rain', 'Ambient', 'Late night'];
 
-export const trackUrl = (track) => `/api/music/${track.url}`;
+// If the URL starts with http, use it directly. Otherwise, prepend the base URL.
+export const trackUrl = (track) => track.url.startsWith('http') ? track.url : `${BASE_URL}${track.url}`;
 
 export function getTrackGradient(title) {
   let hash = 0;
