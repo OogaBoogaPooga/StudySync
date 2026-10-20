@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 const LS_KEY = 'studysync_quokka';
 const CLICK_WINDOW_MS = 1500;
 
-export default function Logo({ size = 'md', className }) {
+export default function Logo({ size = 'md', compact = false, className }) {
   const [quokka, setQuokka] = useState(() => {
     try { return localStorage.getItem(LS_KEY) === '1'; } catch { return false; }
   });
@@ -23,9 +23,9 @@ export default function Logo({ size = 'md', className }) {
   };
 
   const tileSize =
-    size === 'sm' ? 'h-9 w-9 rounded-lg' :
+    size === 'sm' ? 'h-8 w-8 rounded-lg' :
     size === 'lg' ? 'h-14 w-14 rounded-2xl' :
-    'h-11 w-11 rounded-xl';
+    'h-10 w-10 rounded-xl';
 
   const textSize =
     size === 'sm' ? 'text-base' :
@@ -55,7 +55,10 @@ export default function Logo({ size = 'md', className }) {
           )}
         />
       </span>
-      <span className={cn('font-bold gradient-text', textSize)}>StudySync</span>
+      {/* Only render the text if NOT compact */}
+      {!compact && (
+        <span className={cn('font-bold gradient-text', textSize)}>StudySync</span>
+      )}
     </button>
   );
 }
