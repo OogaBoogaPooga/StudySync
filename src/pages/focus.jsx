@@ -17,6 +17,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog.jsx';
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip);
 
 const NOTES_KEY = 'studysync_session_notes';
+const UNLOCK_KEY = 'studysync_games_unlocked';
 
 const DISTRACTION_TIPS = [
   'Put your phone in another room or enable Do Not Disturb.',
@@ -35,6 +36,9 @@ export default function Focus() {
   const [history, setHistory] = useState([]);
   const [stats, setStats] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [bonusUnlocked, setBonusUnlocked] = useState(
+    () => localStorage.getItem(UNLOCK_KEY) === 'true'
+  );
 
   const loadHistory = () =>
     Promise.all([api('/sessions'), api('/sessions/stats')])
@@ -61,6 +65,17 @@ export default function Focus() {
     if (timer.toast) toast(timer.toast.message);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timer.toast?.id]);
+
+  // Update the banner the moment the timer fires the unlock event
+  useEffect(() => {
+    const check = () => setBonusUnlocked(localStorage.getItem(UNLOCK_KEY) === 'true');
+    window.addEventListener('studysync:gamesUnlocked', check);
+    window.addEventListener('storage', check);
+    return () => {
+      window.removeEventListener('studysync:gamesUnlocked', check);
+      window.removeEventListener('storage', check);
+    };
+  }, []);
 
   useEffect(() => {
     const label = timer.mode === 'focus' ? 'Focus' : 'Break';
@@ -132,6 +147,12 @@ export default function Focus() {
             </p>
           </CardContent>
         </Card>
+
+        {timer.mode === 'focus' && !bonusUnlocked && (
+          <p className="text-center text-sm text-muted-foreground">
+            Bonus unlocks after a full session.
+          </p>
+        )}
 
         <Card>
           <CardHeader>
