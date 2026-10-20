@@ -2,14 +2,14 @@
  * 25 study tracks. Original names preserved, mapped to working public domain CDN URLs.
  */
 export const TRACKS = [
-  { id: 't01', title: '2 AM Debug Loop',          artist: 'Open Lo-Fi', url: 'https://cdn.pixabay.com/audio/2022/03/15/audio_c8c8a73467.mp3', mood: 'Focus' },
-  { id: 't02', title: 'Brushstrokes and Rain',     artist: 'Open Lo-Fi', url: 'https://cdn.pixabay.com/audio/2021/11/25/audio_91b32e02f9.mp3', mood: 'Rain' },
-  { id: 't03', title: 'Butter and Windowlight',    artist: 'Open Lo-Fi', url: 'https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3', mood: 'Morning' },
-  { id: 't04', title: 'Chapter By Lamplight',      artist: 'Open Lo-Fi', url: 'https://cdn.pixabay.com/audio/2022/01/18/audio_d0a13f69d2.mp3', mood: 'Reading' },
-  { id: 't05', title: 'Coffee Ring Notebook',      artist: 'Open Lo-Fi', url: 'https://cdn.pixabay.com/audio/2022/08/02/audio_884fe92c21.mp3', mood: 'Focus' },
-  { id: 't06', title: 'Continue Screen Dreams',    artist: 'Open Lo-Fi', url: 'https://cdn.pixabay.com/audio/2022/03/15/audio_c8c8a73467.mp3', mood: 'Chill' },
-  { id: 't07', title: 'Cursor After Midnight',     artist: 'Open Lo-Fi', url: 'https://cdn.pixabay.com/audio/2021/11/25/audio_91b32e02f9.mp3', mood: 'Late night' },
-  { id: 't08', title: 'Dog Eared Pages',           artist: 'Open Lo-Fi', url: 'https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3', mood: 'Reading' },
+  { id: 't01', title: '2 AM Debug Loop',          artist: 'Open Lo-Fi', url: 'https://cdn.pixabay.com/audio/2022/03/15/audio_c8c8a73467.mp3', mood: 'Focus' }, // broken
+  { id: 't02', title: 'Brushstrokes and Rain',     artist: 'Open Lo-Fi', url: 'https://cdn.pixabay.com/audio/2021/11/25/audio_91b32e02f9.mp3', mood: 'Rain' }, // good
+  { id: 't03', title: 'Butter and Windowlight',    artist: 'Open Lo-Fi', url: 'https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3', mood: 'Morning' }, // good
+  { id: 't04', title: 'Chapter By Lamplight',      artist: 'Open Lo-Fi', url: 'https://cdn.pixabay.com/audio/2022/01/18/audio_d0a13f69d2.mp3', mood: 'Reading' }, // not really lofi but works
+  { id: 't05', title: 'Coffee Ring Notebook',      artist: 'Open Lo-Fi', url: 'https://cdn.pixabay.com/audio/2022/08/02/audio_884fe92c21.mp3', mood: 'Focus' }, // works its ok not my fav thats why we have options lol
+  { id: 't06', title: 'Continue Screen Dreams',    artist: 'Open Lo-Fi', url: 'https://cdn.pixabay.com/audio/2022/03/15/audio_c8c8a73467.mp3', mood: 'Chill' }, // broken
+  { id: 't07', title: 'Cursor After Midnight',     artist: 'Open Lo-Fi', url: 'https://cdn.pixabay.com/audio/2021/11/25/audio_91b32e02f9.mp3', mood: 'Late night' }, // my fav very nice
+  { id: 't08', title: 'Dog Eared Pages',           artist: 'Open Lo-Fi', url: 'https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3', mood: 'Reading' }, // very good
   { id: 't09', title: 'Exhale the Morning',        artist: 'Open Lo-Fi', url: 'https://cdn.pixabay.com/audio/2022/01/18/audio_d0a13f69d2.mp3', mood: 'Morning' },
   { id: 't10', title: 'Faded Corners of the Page', artist: 'Open Lo-Fi', url: 'https://cdn.pixabay.com/audio/2022/08/02/audio_884fe92c21.mp3', mood: 'Reading' },
   { id: 't11', title: 'First Coffee Thoughts',     artist: 'Open Lo-Fi', url: 'https://cdn.pixabay.com/audio/2022/03/15/audio_c8c8a73467.mp3', mood: 'Morning' },
