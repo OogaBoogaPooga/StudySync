@@ -1,10 +1,12 @@
-/**
- * 25 study tracks from Open Lo-Fi (github.com/btahir/open-lofi).
- * CC0 1.0 Universal — public domain, no attribution required.
- * Files served from /api/music/<filename> on the Railway volume.
- */
 export const TRACKS = [
-  { id: 't01', title: '2 AM Debug Loop',          artist: 'Open Lo-Fi', url: '2-am-debug-loop.mp3',          mood: 'Focus' },
+  { 
+    id: 't01', 
+    title: '2 AM Debug Loop', 
+    artist: 'Open Lo-Fi', 
+    url: '2-am-debug-loop.mp3', 
+    mood: 'Focus',
+    // Add real image URLs here later if you want: image: '/covers/debug.jpg'
+  },
   { id: 't02', title: 'Brushstrokes and Rain',     artist: 'Open Lo-Fi', url: 'brushstrokes-and-rain.mp3',     mood: 'Rain' },
   { id: 't03', title: 'Butter and Windowlight',    artist: 'Open Lo-Fi', url: 'butter-and-windowlight.mp3',    mood: 'Morning' },
   { id: 't04', title: 'Chapter By Lamplight',      artist: 'Open Lo-Fi', url: 'chapter-by-lamplight.mp3',      mood: 'Reading' },
@@ -34,3 +36,13 @@ export const TRACKS = [
 export const MOODS = ['All', 'Focus', 'Morning', 'Reading', 'Chill', 'Rain', 'Ambient', 'Late night'];
 
 export const trackUrl = (track) => `/api/music/${track.url}`;
+
+export function getTrackGradient(title) {
+  let hash = 0;
+  for (let i = 0; i < title.length; i++) {
+    hash = title.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const h1 = Math.abs(hash) % 360;
+  const h2 = (h1 + 45) % 360;
+  return `linear-gradient(135deg, hsl(${h1}, 60%, 45%), hsl(${h2}, 60%, 20%))`;
+}
