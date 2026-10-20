@@ -23,7 +23,7 @@ const BASE_NAV = [
   { to: '/rooms', label: 'Rooms', icon: Users },
 ];
 
-const RECESS_NAV = { to: '/study', label: 'Recess', icon: Gamepad2 };
+const RECESS_NAV = { to: '/study', label: 'Games', icon: Gamepad2 };
 
 function useGamesUnlocked() {
   const [unlocked, setUnlocked] = useState(
