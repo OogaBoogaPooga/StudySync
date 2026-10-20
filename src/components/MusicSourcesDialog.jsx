@@ -14,6 +14,20 @@ export function readSourcePref() {
   }
 }
 
+// Helper to make sure pasted URLs work with the APIs
+function parseSpotifyUrl(url) {
+  if (!url) return '';
+  if (url.startsWith('spotify:')) return url;
+  const match = url.match(/playlist[/:]([a-zA-Z0-9]+)/);
+  return match ? `spotify:playlist:${match[1]}` : url;
+}
+
+function parseYouTubeUrl(url) {
+  if (!url) return '';
+  const match = url.match(/[?&]list=([a-zA-Z0-9_-]+)/);
+  return match ? `https://www.youtube.com/playlist?list=${match[1]}` : url;
+}
+
 export default function MusicSourcesDialog({ open, onClose }) {
   const [type, setType] = useState('builtin');
   const [spotify, setSpotify] = useState('');
@@ -30,11 +44,15 @@ export default function MusicSourcesDialog({ open, onClose }) {
   }, [open]);
 
   const save = () => {
-    const payload =
-      type === 'spotify' ? { type, spotify } :
-      type === 'soundcloud' ? { type, soundcloud } :
-      type === 'youtube' ? { type, youtube } :
-      { type: 'builtin' };
+    let payload = { type: 'builtin' };
+    
+    if (type === 'spotify') {
+      payload = { type, spotify: parseSpotifyUrl(spotify) };
+    } else if (type === 'youtube') {
+      payload = { type, youtube: parseYouTubeUrl(youtube) };
+    } else if (type === 'soundcloud') {
+      payload = { type, soundcloud };
+    }
     
     localStorage.setItem(KEY, JSON.stringify(payload));
     window.dispatchEvent(new CustomEvent('studysync:musicSourceChanged'));
@@ -68,18 +86,26 @@ export default function MusicSourcesDialog({ open, onClose }) {
           </div>
 
           {type === 'spotify' && (
-            <Input placeholder="https://open.spotify.com/playlist/…" value={spotify} onChange={(e) => setSpotify(e.target.value)} />
+            <div className="space-y-2">
+              <Input placeholder="Paste Spotify Playlist Link..." value={spotify} onChange={(e) => setSpotify(e.target.value)} />
+              <p className="text-[10px] text-muted-foreground px-1">We'll automatically extract the playlist ID.</p>
+            </div>
           )}
           {type === 'soundcloud' && (
-            <Input placeholder="https://soundcloud.com/…/sets/…" value={soundcloud} onChange={(e) => setSoundcloud(e.target.value)} />
+            <div className="space-y-2">
+              <Input placeholder="Paste SoundCloud Set Link..." value={soundcloud} onChange={(e) => setSoundcloud(e.target.value)} />
+            </div>
           )}
           {type === 'youtube' && (
-            <Input placeholder="https://www.youtube.com/playlist?list=…" value={youtube} onChange={(e) => setYoutube(e.target.value)} />
+            <div className="space-y-2">
+              <Input placeholder="Paste YouTube Playlist Link..." value={youtube} onChange={(e) => setYoutube(e.target.value)} />
+              <p className="text-[10px] text-muted-foreground px-1">Make sure the link contains a playlist (list=...).</p>
+            </div>
           )}
 
           <div className="flex justify-end gap-2 border-t pt-3">
             <Button variant="ghost" onClick={onClose}>Cancel</Button>
-            <Button variant="gradient" onClick={save}>Use this source</Button>
+            <Button variant="gradient" onClick={save}>Save Source</Button>
           </div>
         </div>
       </DialogContent>
