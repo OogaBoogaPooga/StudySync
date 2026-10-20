@@ -4,9 +4,6 @@ import { useApp } from './lib/store.jsx';
 import Layout from './components/Layout.jsx';
 import { MusicProvider } from './lib/music.jsx';
 import { TimerProvider } from './lib/timer.jsx';
-import MusicPlayer from './components/MusicPlayer.jsx';
-import TimerBadge from './components/TimerBadge.jsx';
-import InstallBanner from './components/InstallBanner.jsx';
 import GamesGuard from './components/GamesGuard.jsx';
 
 const Login = lazy(() => import('./pages/Login.jsx'));
@@ -60,9 +57,6 @@ export default function App() {
             </Route>
           </Routes>
         </Suspense>
-        <MusicPlayer />
-        <TimerBadge />
-        <InstallBanner />
       </TimerProvider>
     </MusicProvider>
   );
