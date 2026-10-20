@@ -90,9 +90,8 @@ export default function Layout() {
   const SidebarInner = ({ compact = false, onNavigate }) => (
     <>
       <div className={cn('flex items-center border-b px-4 py-4', compact ? 'justify-center' : 'justify-between')}>
-        {/* Logo.jsx already contains the text "StudySync", so we don't repeat it here */}
         <NavLink to="/" onClick={onNavigate}>
-          <Logo size={compact ? 'sm' : 'md'} />
+          <Logo size={compact ? 'sm' : 'md'} compact={compact} />
         </NavLink>
         {!compact && (
           <Button variant="ghost" size="icon" onClick={toggleSidebar} title="Collapse sidebar" className="hidden md:inline-flex">
