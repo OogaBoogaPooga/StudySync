@@ -23,7 +23,7 @@ const BASE_NAV = [
   { to: '/rooms', label: 'Rooms', icon: Users },
 ];
 
-const RECESS_NAV = { to: '/recess', label: 'Recess', icon: Gamepad2 };
+const RECESS_NAV = { to: '/study', label: 'Recess', icon: Gamepad2 };
 
 function useGamesUnlocked() {
   const [unlocked, setUnlocked] = useState(
@@ -75,8 +75,7 @@ export default function Layout() {
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <a href="#main" className="sr-only">Skip to content</a>
-      {/* ... keep the rest of your Layout JSX exactly as it is ... */}
-      {/* Just make sure the nav map uses the NAV variable above. */}
+      {/* The rest of your Layout JSX is unchanged — the nav renders from NAV above. */}
     </div>
   );
 }
