@@ -4,7 +4,7 @@ import { useApp } from './lib/store.jsx';
 import Layout from './components/Layout.jsx';
 import { MusicProvider } from './lib/music.jsx';
 import { TimerProvider } from './lib/timer.jsx';
-import MusicPill from './components/MusicPill.jsx';
+import MusicPlayer from './components/MusicPlayer.jsx';
 import TimerBadge from './components/TimerBadge.jsx';
 import InstallBanner from './components/InstallBanner.jsx';
 import GamesGuard from './components/GamesGuard.jsx';
@@ -56,18 +56,11 @@ export default function App() {
               <Route path="quiz/:id" element={<Quiz />} />
               <Route path="assignment/:id" element={<AssignmentWorkspace />} />
               <Route path="learn/:id" element={<Learn />} />
-              <Route
-                path="study"
-                element={
-                  <GamesGuard>
-                    <Games />
-                  </GamesGuard>
-                }
-              />
+              <Route path="study" element={<GamesGuard><Games /></GamesGuard>} />
             </Route>
           </Routes>
         </Suspense>
-        <MusicPill />
+        <MusicPlayer />
         <TimerBadge />
         <InstallBanner />
       </TimerProvider>
