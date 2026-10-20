@@ -7,6 +7,7 @@ import { TimerProvider } from './lib/timer.jsx';
 import MusicPill from './components/MusicPill.jsx';
 import TimerBadge from './components/TimerBadge.jsx';
 import InstallBanner from './components/InstallBanner.jsx';
+import GamesGuard from './components/GamesGuard.jsx';
 
 const Login = lazy(() => import('./pages/Login.jsx'));
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
@@ -24,7 +25,7 @@ const Learn = lazy(() => import('./pages/Learn.jsx'));
 const Games = lazy(() => import('./pages/Games.jsx'));
 
 const Spinner = () => (
-  <div className="flex h-[60vh] items-center justify-center" role="status" aria-label="Loading">
+  <div className="flex h-screen items-center justify-center">
     <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
   </div>
 );
@@ -37,33 +38,39 @@ function Protected({ children }) {
 
 export default function App() {
   return (
-    <TimerProvider>
-      <MusicProvider>
+    <MusicProvider>
+      <TimerProvider>
         <Suspense fallback={<Spinner />}>
           <Routes>
             <Route path="/login" element={<Login />} />
-            <Route path="/share/:shareId" element={<SharedSet />} />
-            <Route element={<Protected><Layout /></Protected>}>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/calendar" element={<CalendarPage />} />
-              <Route path="/focus" element={<Focus />} />
-              <Route path="/notes" element={<Notes />} />
-              <Route path="/notes/:id" element={<StudySet />} />
-              <Route path="/learn/:setId" element={<Learn />} />
-              <Route path="/work/:id" element={<AssignmentWorkspace />} />
-              <Route path="/quiz/:id" element={<Quiz />} />
-              <Route path="/grades" element={<Grades />} />
-              <Route path="/rooms" element={<Rooms />} />
-              <Route path="/rooms/:code" element={<Room />} />
-              <Route path="/games" element={<Games />} />
+            <Route path="/" element={<Protected><Layout /></Protected>}>
+              <Route index element={<Dashboard />} />
+              <Route path="calendar" element={<CalendarPage />} />
+              <Route path="focus" element={<Focus />} />
+              <Route path="notes" element={<Notes />} />
+              <Route path="notes/:id" element={<StudySet />} />
+              <Route path="shared/:token" element={<SharedSet />} />
+              <Route path="grades" element={<Grades />} />
+              <Route path="rooms" element={<Rooms />} />
+              <Route path="rooms/:code" element={<Room />} />
+              <Route path="quiz/:id" element={<Quiz />} />
+              <Route path="assignment/:id" element={<AssignmentWorkspace />} />
+              <Route path="learn/:id" element={<Learn />} />
+              <Route
+                path="recess"
+                element={
+                  <GamesGuard>
+                    <Games />
+                  </GamesGuard>
+                }
+              />
             </Route>
-            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-          <MusicPill />
-          <TimerBadge />
-          <InstallBanner />
         </Suspense>
-      </MusicProvider>
-    </TimerProvider>
+        <MusicPill />
+        <TimerBadge />
+        <InstallBanner />
+      </TimerProvider>
+    </MusicProvider>
   );
 }
