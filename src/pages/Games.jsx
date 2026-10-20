@@ -6,6 +6,21 @@ import GAMES_DATA from '@/lib/games.json';
 
 const PLAY_BASE = '/play/';
 
+function getGradient(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = Math.abs(hash) % 360;
+  return `linear-gradient(135deg, hsl(${hue}, 60%, 45%), hsl(${(hue + 45) % 360}, 60%, 25%))`;
+}
+
+function getInitials(title) {
+  const words = title.trim().split(/\s+/);
+  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+  return title.substring(0, 2).toUpperCase();
+}
+
 export default function Games() {
   const [search, setSearch] = useState('');
   const [active, setActive] = useState(null);
@@ -46,7 +61,6 @@ export default function Games() {
     }
   };
 
-  // Player overlay
   if (active) {
     return (
       <div className="fixed inset-0 z-[200] flex flex-col bg-background">
@@ -137,15 +151,22 @@ export default function Games() {
 
 function GameCard({ game, onOpen }) {
   const [imgError, setImgError] = useState(false);
-  // Thumbnails are usually located at /projects/<slug>/thumb.png locally
-  const thumbUrl = `${PLAY_BASE}${game.slug}/thumb.png`;
+  const gradient = getGradient(game.title);
+  const initials = getInitials(game.title);
+
+  const thumbUrl = game.thumbnail
+    ? `${PLAY_BASE}${game.thumbnail}`
+    : `${PLAY_BASE}${game.slug}/thumb.png`;
 
   return (
     <button
       onClick={onOpen}
-      className="group overflow-hidden rounded-xl border bg-card text-left transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+      className="group relative flex flex-col overflow-hidden rounded-xl border bg-card text-left transition-all hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg"
     >
-      <div className="relative flex aspect-square items-center justify-center overflow-hidden bg-gradient-to-br from-primary/10 to-primary/5">
+      <div
+        className="relative flex aspect-square w-full items-center justify-center overflow-hidden transition-all"
+        style={{ background: gradient }}
+      >
         {!imgError ? (
           <img
             src={thumbUrl}
@@ -155,11 +176,18 @@ function GameCard({ game, onOpen }) {
             loading="lazy"
           />
         ) : (
-          <Gamepad2 className="h-8 w-8 text-primary/40 transition-transform duration-300 group-hover:scale-110" />
+          <>
+            <span className="absolute text-6xl font-black text-white/20 select-none">
+              {initials}
+            </span>
+            <Gamepad2 className="absolute bottom-2 right-2 h-5 w-5 text-white/40" />
+          </>
         )}
       </div>
-      <div className="p-2.5">
-        <p className="truncate text-sm font-medium leading-tight">{game.title}</p>
+      <div className="p-3 bg-card border-t border-border/50">
+        <p className="truncate text-sm font-semibold leading-tight group-hover:text-primary transition-colors">
+          {game.title}
+        </p>
       </div>
     </button>
   );
