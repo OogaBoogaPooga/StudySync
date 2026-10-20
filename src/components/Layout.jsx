@@ -90,9 +90,9 @@ export default function Layout() {
   const SidebarInner = ({ compact = false, onNavigate }) => (
     <>
       <div className={cn('flex items-center border-b px-4 py-4', compact ? 'justify-center' : 'justify-between')}>
-        <NavLink to="/" onClick={onNavigate} className="flex items-center gap-2">
+        {/* Logo.jsx already contains the text "StudySync", so we don't repeat it here */}
+        <NavLink to="/" onClick={onNavigate}>
           <Logo size={compact ? 'sm' : 'md'} />
-          {!compact && <span className="text-lg font-bold tracking-tight">StudySync</span>}
         </NavLink>
         {!compact && (
           <Button variant="ghost" size="icon" onClick={toggleSidebar} title="Collapse sidebar" className="hidden md:inline-flex">
@@ -168,20 +168,18 @@ export default function Layout() {
           <Button variant="ghost" size="icon" onClick={() => setMobileOpen(true)} aria-label="Open menu">
             <PanelLeftOpen className="h-4 w-4" />
           </Button>
-          <NavLink to="/" className="flex items-center gap-2">
+          <NavLink to="/">
             <Logo size="sm" />
-            <span className="text-base font-bold">StudySync</span>
           </NavLink>
         </header>
 
-        <main id="main" className="flex-1 overflow-y-auto pb-24">
+        <main id="main" className="flex-1 overflow-y-auto pb-28">
           <div className="mx-auto w-full max-w-7xl p-4 sm:p-6">
             <Outlet />
           </div>
         </main>
       </div>
 
-      {/* Global Floats - Only appear inside the authenticated layout */}
       <MusicPlayer />
       <TimerBadge />
       <InstallBanner />
