@@ -28,8 +28,11 @@ export default defineConfig({
       },
       workbox: {
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api\//, /^\/socket\.io\//],
+        navigateFallbackDenylist: [/^\/api\//, /^\/socket\.io\//, /^\/play\//],
         globPatterns: ['**/*.{js,css,html,svg,png,jpg,jpeg,ico,woff2}'],
+        // THE FIX: Explicitly ignore the games folder so Workbox doesn't crash on the big files
+        globIgnores: ['**/games/**'],
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         runtimeCaching: [
           {
             urlPattern: ({ url }) => url.pathname.startsWith('/api/'),

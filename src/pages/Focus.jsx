@@ -9,6 +9,7 @@ import { useMusic } from '@/lib/music.jsx';
 import { useTimer } from '@/lib/timer.jsx';
 import MusicSidebar from '@/components/MusicSidebar.jsx';
 import StreakCard from '@/components/StreakCard.jsx';
+import MusicSourcesDialog from '@/components/MusicSourcesDialog.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card.jsx';
 import { Input, Textarea } from '@/components/ui/input.jsx';
@@ -17,6 +18,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog.jsx';
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip);
 
 const NOTES_KEY = 'studysync_session_notes';
+const UNLOCK_KEY = 'studysync_games_unlocked';
 
 const DISTRACTION_TIPS = [
   'Put your phone in another room or enable Do Not Disturb.',
@@ -35,6 +37,8 @@ export default function Focus() {
   const [history, setHistory] = useState([]);
   const [stats, setStats] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [bonusUnlocked, setBonusUnlocked] = useState(() => localStorage.getItem(UNLOCK_KEY) === 'true');
+  const [sourcesOpen, setSourcesOpen] = useState(false);
 
   const loadHistory = () =>
     Promise.all([api('/sessions'), api('/sessions/stats')])
@@ -61,6 +65,22 @@ export default function Focus() {
     if (timer.toast) toast(timer.toast.message);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timer.toast?.id]);
+
+  useEffect(() => {
+    const check = () => setBonusUnlocked(localStorage.getItem(UNLOCK_KEY) === 'true');
+    window.addEventListener('studysync:gamesUnlocked', check);
+    window.addEventListener('storage', check);
+    return () => {
+      window.removeEventListener('studysync:gamesUnlocked', check);
+      window.removeEventListener('storage', check);
+    };
+  }, []);
+
+  useEffect(() => {
+    const open = () => setSourcesOpen(true);
+    window.addEventListener('studysync:openMusicSources', open);
+    return () => window.removeEventListener('studysync:openMusicSources', open);
+  }, []);
 
   useEffect(() => {
     const label = timer.mode === 'focus' ? 'Focus' : 'Break';
@@ -95,12 +115,7 @@ export default function Focus() {
                   </button>
                 ))}
               </div>
-              <button
-                onClick={() => setSettingsOpen(true)}
-                aria-label="Customize durations"
-                title="Customize durations"
-                className="rounded-full p-2 hover:bg-muted"
-              >
+              <button onClick={() => setSettingsOpen(true)} aria-label="Customize durations" title="Customize durations" className="rounded-full p-2 hover:bg-muted">
                 <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />
               </button>
             </div>
@@ -127,18 +142,20 @@ export default function Focus() {
               <Button variant="outline" size="icon" onClick={timer.skip} aria-label="Skip phase"><SkipForward className="h-4 w-4" /></Button>
             </div>
 
-            <p className="text-xs text-muted-foreground">
-              Timer keeps running in the background — switch tabs or pages freely.
-            </p>
+            <p className="text-xs text-muted-foreground">Timer keeps running in the background — switch tabs or pages freely.</p>
           </CardContent>
         </Card>
+
+        {timer.mode === 'focus' && !bonusUnlocked && (
+          <p className="text-center text-sm text-muted-foreground">
+            Bonus unlocks after a full session.
+          </p>
+        )}
 
         <Card>
           <CardHeader>
             <CardTitle>Session notes</CardTitle>
-            <CardDescription>
-              Auto-saved locally{savedAt ? ` · saved ${format(savedAt, 'h:mm:ss a')}` : ''}. Attached to your session when the round ends.
-            </CardDescription>
+            <CardDescription>Auto-saved locally{savedAt ? ` · saved ${format(savedAt, 'h:mm:ss a')}` : ''}. Attached to your session when the round ends.</CardDescription>
           </CardHeader>
           <CardContent>
             <Textarea rows={5} placeholder="What are you working on? Key takeaways…" value={notes} onChange={(e) => setNotes(e.target.value)} aria-label="Session notes" />
@@ -183,6 +200,7 @@ export default function Focus() {
       </div>
 
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} config={timer.config} onSave={timer.updateConfig} />
+      <MusicSourcesDialog open={sourcesOpen} onClose={() => setSourcesOpen(false)} />
     </div>
   );
 }
@@ -213,10 +231,7 @@ function SettingsDialog({ open, onClose, config, onSave }) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent
-        title="Customize durations"
-        description="Set how long each phase lasts. Changes apply the next time a phase starts."
-      >
+      <DialogContent title="Customize durations" description="Set how long each phase lasts. Changes apply the next time a phase starts.">
         <div className="space-y-4">
           <NumberRow label="Focus" value={focus} setValue={setFocus} min={1} max={180} />
           <NumberRow label="Short break" value={short} setValue={setShort} min={1} max={60} />
@@ -233,15 +248,7 @@ function NumberRow({ label, value, setValue, min, max }) {
     <div className="flex items-center justify-between gap-3">
       <label className="text-sm font-medium">{label}</label>
       <div className="flex items-center gap-2">
-        <Input
-          type="number"
-          min={min}
-          max={max}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          className="w-20 text-right"
-          aria-label={`${label} minutes`}
-        />
+        <Input type="number" min={min} max={max} value={value} onChange={(e) => setValue(e.target.value)} className="w-20 text-right" aria-label={`${label} minutes`} />
         <span className="text-xs text-muted-foreground">min</span>
       </div>
     </div>

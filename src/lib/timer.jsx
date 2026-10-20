@@ -122,6 +122,10 @@ export function TimerProvider({ children }) {
       }
       beep();
     }
+    if (completed && mode === 'focus') {
+    localStorage.setItem('studysync_games_unlocked', 'true');
+    window.dispatchEvent(new CustomEvent('studysync:gamesUnlocked'));
+    }    
 
     if (mode === 'focus') {
       const next = round % 4 === 0 ? 'long' : 'short';
